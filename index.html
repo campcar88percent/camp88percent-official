@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>NAGO CAMP | プレミアム・キャンピングカーレンタル</title>
+
+<!-- Tailwind CSS -->
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Google Fonts: Inter (欧文) & Noto Sans JP (和文) -->
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- AI機能用設定 -->
+
+<script type="importmap">
+
+{
+
+"imports": {
+
+"@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+
+"react": "https://esm.sh/react@^19.2.4",
+
+"react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+
+"react/": "https://esm.sh/react@^19.2.4/"
+
+}
+
+}
+
+</script>
+
+</head>
+
+<body class="bg-white text-black selection:bg-orange-500 selection:text-white">
+
+
+
+<!-- ナビゲーションバー -->
+
+<nav id="navbar" class="fixed top-0 left-0 w-full z-50 transition-all duration-500 py-6 md:py-8 border-b border-transparent">
+
+<div class="max-w-[1440px] mx-auto px-6 md:px-12 flex justify-between items-center gap-8">
+
+<div class="shrink-0 text-xl md:text-2xl font-black tracking-tighter text-white transition-colors" id="nav-logo">
+
+<a href="#">NAGO<span class="text-orange-500">.</span>CAMP</a>
+
+</div>
+
+<div class="flex items-center gap-6 md:gap-12">
+
+<div class="hidden lg:flex items-center gap-8 text-[11px] font-bold uppercase tracking-[0.2em] text-white/80" id="nav-links">
+
+<a href="#concept" class="hover:text-orange-500 transition-colors">01 Concept</a>
+
+<a href="#car" class="hover:text-orange-500 transition-colors">02 Fleet</a>
+
+<a href="#pricing" class="hover:text-orange-500 transition-colors">03 Pricing</a>
+
+<a href="#map-section" class="hover:text-orange-500 transition-colors">04 Map</a>
+
+<a href="#reserve" class="hover:text-orange-500 transition-colors">05 Reserve</a>
+
+</div>
+
+<!-- 予約リンク: hrefをLINEなどのURLに書き換え可能 -->
+
+<a href="#reserve" class="shrink-0 px-6 py-2 md:px-8 md:py-3 text-[10px] md:text-[11px] font-black uppercase tracking-widest bg-white text-black hover:bg-orange-500 hover:text-white transition-all shadow-lg" aria-label="予約フォームへ移動">
+
+Reserve
+
+</a>
+
+</div>
+
+</div>
+
+</nav>
+
+
+
+<!-- ヒーローセクション -->
+
+<header class="relative min-h-screen flex flex-col justify-end bg-black overflow-hidden">
+
+<div class="absolute inset-0 z-0">
+
+<!-- 【画像差し替え箇所1】 car.jpgを自分のファイル名に -->
+<img src="image/oceanhiace.jpg" alt="海辺のキャンピングカー" loading="lazy" class="w-full h-full object-cover grayscale opacity-40 contrast-125">
+
+<div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+
+</div>
+
+<div class="relative z-10 max-w-[1440px] mx-auto w-full px-6 md:px-12 pb-16 md:pb-32">
+
+<h1 class="text-huge font-black text-white uppercase tracking-tighter mb-12">
+
+BEACH<span class="text-orange-500">.</span><br/>
+
+FOREST<span class="text-white/20">.</span>
+
+</h1>
+
+<div class="grid grid-cols-12">
+
+<div class="col-span-12 md:col-span-8 lg:col-start-7 lg:col-span-6 border-t border-white/20 pt-12">
+
+<p class="text-xl md:text-4xl font-black text-white mb-10 leading-tight keep-all">
+
+今日は海辺で眠り、明日は森で眠る。<br />
+
+<span class="text-orange-500 text-2xl md:text-6xl">ホテルいらずの沖縄の旅</span>
+
+</p>
+
+<a href="#reserve" class="inline-block bg-orange-500 text-white px-10 py-5 md:px-16 md:py-8 font-black uppercase text-xs tracking-[0.3em] hover:bg-white hover:text-black transition-all shadow-2xl">
+
+Reservation →
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</header>
+
+
+
+<!-- コンセプト -->
+
+<section id="concept" class="py-24 md:py-48 bg-white overflow-hidden">
+
+<div class="max-w-[1440px] mx-auto px-6 md:px-12">
+
+<div class="grid grid-cols-12 gap-y-12 md:gap-y-0 md:gap-x-20">
+
+<div class="col-span-12 md:col-span-2">
+
+<span class="bg-number">01</span>
+
+</div>
+
+<div class="col-span-12 md:col-span-5">
+
+<h2 class="text-4xl md:text-7xl font-black text-black uppercase leading-[1.1] mb-12 tracking-tighter">
+
+NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
+
+</h2>
+
+<div class="space-y-10">
+
+<p class="border-l-8 border-orange-500 pl-6 text-2xl md:text-3xl font-bold text-black leading-snug italic keep-all">
+
+「決められた場所に泊まる」<br/>という制約から、<br/>あなたを解放します。
+
+</p>
+
+<p class="text-black/60 text-lg leading-relaxed font-light">
+名護を拠点に、沖縄北部の豊かな自然を自由に巡る。スーパーロングハイエースキャンピング車は、風景そのものをあなたの部屋に変える「走るベッドルーム」です。
+</p>
+
+</div>
+
+</div>
+
+<div class="col-span-12 md:col-span-5">
+
+<div class="aspect-[4/5] overflow-hidden grayscale contrast-125 border-[15px] md:border-[30px] border-[#f8fafc] shadow-2xl relative">
+
+<!-- 【画像差し替え箇所2】 -->
+
+<img src="image/hiaceinsideback.jpeg" alt="Concept" class="w-full h-full object-cover">
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+
+<!-- 車両紹介 -->
+
+<section id="car" class="py-24 md:py-48 bg-[#f8fafc]">
+
+<div class="max-w-[1440px] mx-auto px-6 md:px-12">
+
+<div class="flex flex-col border-b-2 border-black pb-6 sm:pb-10 mb-8 sm:mb-20">
+
+<span class="bg-number">02</span>
+
+<h2 class="text-5xl md:text-[10rem] font-black text-black uppercase tracking-tighter leading-none">FLEET<span class="text-orange-500">.</span></h2>
+
+</div>
+
+<div class="grid grid-cols-12 gap-4 sm:gap-12 lg:gap-24">
+
+<div class="col-span-12 lg:col-span-7">
+
+<div class="bg-white p-1 sm:p-4 shadow-2xl border border-black/5 vehicle-wrap">
+
+<!-- 【画像差し替え箇所3】 -->
+
+<picture class="vehicle-figure">
+	<source media="(max-width:420px)" type="image/webp" srcset="image/tenkaiz-mobile.webp 1x, image/tenkaiz-mobile@2x.webp 2x">
+	<source type="image/webp" srcset="image/tenkaiz.webp 1x, image/tenkaiz@2x.webp 2x">
+	<img src="image/tenkaiz.jpg" alt="キャンピングカー 展開図" loading="lazy" decoding="async" width="1200" height="400">
+</picture>
+
+</div>
+</div>
+
+<!-- 左カラム用の stat カード（左右均等・中央寄せ） -->
+<div class="col-span-12 lg:col-span-7">
+  <div class="grid grid-cols-2 md:grid-cols-2 gap-6 mt-8 stat-grid">
+
+	<div class="stat-card bg-black text-white p-3 sm:p-6">
+		<div class="stat-label">MAX RIDING</div>
+		<div class="stat-number text-4xl md:text-6xl font-black">08</div>
+	</div>
+
+	<div class="stat-card bg-orange-500 text-white p-3 sm:p-6">
+		<div class="stat-label">MAX SLEEPING</div>
+		<div class="stat-number text-4xl md:text-6xl font-black">03</div>
+	</div>
+
+  </div>
+
+  <!-- 標準設備一覧 -->
+  <div class="mt-6 sm:mt-10 equipment-list">
+    <h4 class="text-sm sm:text-base font-black tracking-wider uppercase mb-3 sm:mb-4 text-black/70">Standard Equipment</h4>
+    <div class="flex flex-wrap gap-1.5 sm:gap-2">
+      <span class="equip-tag">高断熱処理</span>
+      <span class="equip-tag">カセットコンロ</span>
+      <span class="equip-tag">脱着式テーブル</span>
+      <span class="equip-tag">冷蔵庫 40L</span>
+      <span class="equip-tag">ステンレスシンク</span>
+      <span class="equip-tag">給排水ポリタンク 各10L</span>
+      <span class="equip-tag">LED照明</span>
+      <span class="equip-tag">全面遮光カーテン</span>
+      <span class="equip-tag">外部コンセント</span>
+      <span class="equip-tag">走行充電システム</span>
+      <span class="equip-tag">サブバッテリー 105A</span>
+      <span class="equip-tag">15インチモニター</span>
+      <span class="equip-tag">リアスピーカー</span>
+      <span class="equip-tag">100V電源コンセント ×3</span>
+      <span class="equip-tag">USBポート</span>
+    </div>
+  </div>
+</div>
+<div class="col-span-12 lg:col-span-5 flex flex-col justify-center">
+
+	<!-- right-column stat cards removed (kept left-column set instead) -->
+
+	<div class="border-t-8 border-black pt-12 order-1 lg:order-2">
+
+	<h3 class="text-4xl md:text-7xl font-black uppercase mb-10 leading-none">ULTIMATE<br/>VAN LIFE</h3>
+
+	<ul class="space-y-6 text-lg font-bold text-black/80">
+
+	<li class="flex items-start gap-4"><span class="text-orange-500 font-black">01</span> 普通免許(AT)で運転可能なハイエース</li>
+
+	<li class="flex items-start gap-4"><span class="text-orange-500 font-black">02</span> 免許取得から3年以上経過している方（21才以上）</li>
+
+	<li class="flex items-start gap-4"><span class="text-orange-500 font-black">03</span> 貸渡契約書に同意された方</li>
+
+	</ul>
+
+	</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- ============ PRICING ============ -->
+<section id="pricing" class="py-16 md:py-28 bg-black text-white">
+<div class="max-w-[1440px] mx-auto px-6 md:px-12">
+
+	<!-- heading -->
+	<div class="mb-14 md:mb-20">
+		<span class="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-orange-500 mb-3">03 — Pricing</span>
+		<h2 class="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">STAY LONGER<span class="text-orange-500">,</span><br/>PAY LESS<span class="text-orange-500">.</span></h2>
+		<p class="mt-6 text-white/60 text-base md:text-lg max-w-2xl leading-relaxed">
+			ホテル代、レンタカー代、外食費 — 旅のコストは積み重なる。<br/>
+			NAGO.CAMPなら<strong class="text-white">「移動・宿泊・遊ぶ」がすべて1台で完結</strong>。<br class="hidden md:block"/>
+			大工職人が無垢材と高断熱パネルで仕上げた居住空間は、木の温もりと職人のこだわりが息づく一台。<br class="hidden md:block"/>
+			1週間プランなら<strong class="text-orange-500">1日わずか¥15,000</strong>で、本物のバンライフが始まります。
+		</p>
+	</div>
+
+	<!-- pricing cards -->
+	<div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl">
+
+		<!-- card: 1泊2日 -->
+		<div class="pricing-card border-2 border-white/20 p-8 md:p-10 relative">
+			<span class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">Short Stay</span>
+			<h3 class="text-2xl md:text-3xl font-black mt-2 mb-6">1泊2日〜</h3>
+			<div class="flex items-end gap-2">
+				<span class="text-5xl md:text-6xl font-black leading-none">¥25,000</span>
+				<span class="text-white/50 text-sm font-bold mb-2">/日（税込）</span>
+			</div>
+			<ul class="mt-8 space-y-3 text-sm text-white/60">
+				<li class="flex items-center gap-2"><span class="text-orange-500">✓</span> 車両・寝具・キッチン一式</li>
+				<li class="flex items-center gap-2"><span class="text-orange-500">✓</span> サブバッテリー・走行充電・外部電源</li>
+				<li class="flex items-center gap-2"><span class="text-orange-500">✓</span> 名護発着・沖縄全域どこでもOK</li>
+			</ul>
+		</div>
+
+		<!-- card: 1週間 (recommended) -->
+		<div class="pricing-card pricing-card--featured border-2 border-orange-500 p-8 md:p-10 relative">
+			<span class="absolute -top-4 right-6 bg-orange-500 text-black text-[11px] font-black uppercase tracking-wider px-4 py-1">Best Value</span>
+			<span class="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-500">Weekly Plan</span>
+			<h3 class="text-2xl md:text-3xl font-black mt-2 mb-6">1週間〜</h3>
+			<div class="flex items-end gap-2">
+				<span class="text-5xl md:text-6xl font-black leading-none text-orange-500">¥15,000</span>
+				<span class="text-white/50 text-sm font-bold mb-2">/日（税込）</span>
+			</div>
+			<p class="mt-3 text-sm text-white/40"><del>¥175,000</del> → <strong class="text-white">¥105,000</strong><span class="text-white/40"> /週</span><span class="ml-2 text-orange-500 font-black">40%OFF</span></p>
+			<ul class="mt-8 space-y-3 text-sm text-white/60">
+				<li class="flex items-center gap-2"><span class="text-orange-500">✓</span> Short Stay 全装備込み</li>
+				<li class="flex items-center gap-2"><span class="text-orange-500">✓</span> 1日¥15,000 — ホテル+レンタカーより圧倒的にお得</li>
+				<li class="flex items-center gap-2"><span class="text-orange-500">✓</span> ワーケーション・移住お試し・長期滞在に</li>
+			</ul>
+		</div>
+
+	</div>
+
+	<!-- options -->
+	<div class="mt-10 md:mt-14 flex flex-wrap gap-4 md:gap-6 max-w-4xl">
+		<div class="flex items-center gap-3 bg-white/5 border border-white/10 px-5 py-3">
+			<span class="text-orange-500 font-black text-lg">+</span>
+			<div>
+				<span class="block text-xs text-white/40 font-bold uppercase tracking-wider">免責補償</span>
+				<span class="text-lg font-black">¥3,300<span class="text-white/40 text-xs font-bold">/日</span></span>
+			</div>
+		</div>
+		<div class="flex items-center gap-3 bg-white/5 border border-white/10 px-5 py-3">
+			<span class="text-orange-500 font-black text-lg">+</span>
+			<div>
+				<span class="block text-xs text-white/40 font-bold uppercase tracking-wider">リネン費</span>
+				<span class="text-lg font-black">¥5,500<span class="text-white/40 text-xs font-bold">/レンタル</span></span>
+			</div>
+		</div>
+	</div>
+
+	<!-- craft note -->
+	<p class="mt-10 text-xs text-white/30 max-w-xl leading-relaxed">
+		※ 全車両、大工職人が手がける無垢杉の木工シェルを搭載。高断熱パネルで外気熱をカットし、車内エアコンの効きも抜群です。「大工工法×バンライフ」— この価格で、この品質を。
+	</p>
+
+</div>
+</section>
+
+
+<!-- AI コンシェルジュ -->
+
+<!-- 地図セクション: 道の駅 / シャワー / 温泉 -->
+<section id="map-section" class="py-6 md:py-12 bg-white">
+	<div class="max-w-[1440px] mx-auto px-4 md:px-12">
+		<div class="flex items-center justify-between mb-2 md:mb-3">
+			<div>
+				<span class="bg-number">04</span>
+				<h2 class="text-3xl md:text-6xl font-black text-black uppercase tracking-tighter leading-none">MAP<br/>SERVICES<span class="text-orange-500">.</span></h2>
+			</div>
+			<!-- filter buttons moved closer to the map (displayed over the map) -->
+			<div style="height:0"></div>
+		</div>
+
+		<div class="map-bleed">
+			<div class="bg-white border-2 md:border-4 border-black shadow-none md:shadow-[20px_20px_0px_0px_rgba(0,0,0,0.05)] h-[60vh] md:h-[650px] relative">
+				<div id="map" class="w-full h-full" role="region" aria-label="沖縄本島の施設マップ"></div>
+				<!-- マップ操作ガードオーバーレイ -->
+				<div id="map-touch-guard" class="map-touch-guard">
+					<span class="map-touch-hint">≡ タップしてマップを操作</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Map controls (outside the map frame, centered) -->
+		<div class="map-controls map-controls-outside mx-auto flex flex-wrap justify-center items-center gap-2 md:gap-3 mt-2 md:mt-4" role="group" aria-label="マップフィルタ">
+			<button id="filter-michi" type="button" class="px-3 py-2 bg-black text-white font-bold map-legend-button text-xs md:text-sm" aria-pressed="false" aria-label="道の駅を表示" tabindex="0">
+				<img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png" alt="青いピン" class="inline-icon" />道の駅
+			</button>
+			<button id="filter-shower" type="button" class="px-3 py-2 bg-black text-white font-bold map-legend-button text-xs md:text-sm" aria-pressed="false" aria-label="シャワーを表示" tabindex="0">
+				<img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png" alt="緑のピン" class="inline-icon" />シャワー
+			</button>
+			<button id="filter-onsen" type="button" class="px-3 py-2 bg-black text-white font-bold map-legend-button text-xs md:text-sm" aria-pressed="false" aria-label="温泉を表示" tabindex="0">
+				<img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png" alt="赤いピン" class="inline-icon" />温泉
+			</button>
+			<button id="filter-all" type="button" class="px-3 py-2 bg-black text-white font-bold text-xs md:text-sm filter-active" aria-label="すべて表示" aria-pressed="true" tabindex="0">全て表示</button>
+		</div>
+
+		<p class="map-note mt-2 md:mt-3 text-xs md:text-sm text-black/60">＊当マップは沖縄本島の施設紹介のみを目的としています。営業時間・料金・利用可否などの詳細は、事前に各施設へご確認ください。</p>
+	</div>
+</section>
+
+
+
+<!-- 予約カレンダー -->
+
+<section id="reserve" class="py-24 md:py-48 bg-[#f8fafc]">
+
+<div class="max-w-[1440px] mx-auto px-6 md:px-12">
+
+<div class="text-center mb-12 md:mb-20">
+
+<span class="bg-number mx-auto mb-4">05</span>
+
+<h2 class="text-6xl md:text-9xl font-black text-black uppercase tracking-tighter mb-8">RESERVE<span class="text-orange-500">.</span></h2>
+
+<p class="text-black/40 font-bold uppercase tracking-widest">Availability Calendar</p>
+
+</div>
+
+<!-- カレンダーナビゲーション -->
+<div class="max-w-5xl mx-auto">
+	<div id="cal-nav" class="flex items-center justify-center gap-4 mb-6">
+		<button id="cal-prev" type="button" class="w-10 h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-orange-500 transition-colors text-lg font-bold">&lsaquo;</button>
+		<span id="cal-month-label" class="text-lg md:text-2xl font-black tracking-tight min-w-[200px] text-center"></span>
+		<button id="cal-next" type="button" class="w-10 h-10 flex items-center justify-center rounded-full bg-black text-white hover:bg-orange-500 transition-colors text-lg font-bold">&rsaquo;</button>
+	</div>
+	<!-- 凡例 -->
+	<div class="flex justify-center items-center gap-5 mb-4 text-xs font-bold">
+		<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-white border border-black/20 inline-block"></span> 予約可</span>
+		<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-orange-500 inline-block"></span> 予約不可</span>
+		<span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-black/10 inline-block"></span> 過去</span>
+	</div>
+	<!-- 月カレンダーグリッド -->
+	<div id="calendar" class="cal-grid bg-white border-2 border-black shadow-2xl rounded-lg overflow-hidden"></div>
+	<!-- 月ドット（12ヶ月ナビ） -->
+	<div id="cal-dots" class="flex justify-center items-center gap-2 mt-4 flex-wrap"></div>
+</div>
+
+<div class="mt-16 md:mt-20 flex justify-center">
+<button id="open-reserve" type="button" aria-haspopup="dialog" aria-controls="reserve-modal" aria-label="予約モーダルを開く" class="bg-black text-white px-16 py-8 font-black uppercase text-xs tracking-[0.4em] hover:bg-orange-500 transition-all shadow-2xl">
+Reserve Now
+
+</button>
+
+</div>
+
+</div>
+
+</section>
+
+
+
+<!-- フッター -->
+
+<footer class="bg-black text-white py-24 md:py-32">
+
+<div class="max-w-[1440px] mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-12">
+
+<div class="text-center md:text-left">
+
+<h3 class="text-5xl font-black tracking-tighter mb-4 italic">NAGO<span class="text-orange-500">.</span>CAMP</h3>
+
+<p class="text-white/30 uppercase tracking-[0.4em] font-bold text-[10px]">Premium Van-Life Experience</p>
+
+</div>
+
+<div class="text-white/20 text-[10px] font-bold tracking-widest uppercase text-center md:text-right">
+
+905-0014 Okinawa, Nago, Minato 2-1-1<br>
+
+© 2026 NAGO CAMP RENTAL SYSTEM.
+
+</div>
+
+</div>
+株式会社88PERCENT 沖縄県名護市宇茂佐の森１２３　TEL:08085206929
+</footer>
+
+
+
+<script type="module" src="script.js"></script>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- 予約モーダル -->
+<div id="reserve-modal" aria-hidden="true" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+	<div class="bg-white w-full max-w-xl rounded-lg shadow-xl p-6 md:p-10 max-h-[90vh] overflow-y-auto">
+		<div class="flex justify-between items-center mb-6">
+			<h3 class="text-xl font-black">予約フォーム</h3>
+			<button id="close-reserve" type="button" class="text-black/60 hover:text-black text-2xl leading-none">&times;</button>
+		</div>
+		<form id="reserve-form" class="space-y-5" enctype="multipart/form-data">
+
+			<!-- お客様情報 -->
+			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2">お客様情報</p>
+			<div>
+				<label class="block text-xs font-bold mb-1">お名前 <span class="text-red-500">*</span></label>
+				<input name="name" required placeholder="名護 太郎" class="w-full border border-black/20 rounded px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
+			</div>
+			<div>
+				<label class="block text-xs font-bold mb-1">メールアドレス <span class="text-red-500">*</span></label>
+				<input name="email" type="email" required placeholder="example@email.com" class="w-full border border-black/20 rounded px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
+			</div>
+			<div>
+				<label class="block text-xs font-bold mb-1">電話番号 <span class="text-red-500">*</span></label>
+				<input name="phone" type="tel" required placeholder="090-1234-5678" class="w-full border border-black/20 rounded px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
+			</div>
+
+			<!-- 利用期間 -->
+			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2 mt-6">利用期間</p>
+			<div class="grid grid-cols-2 gap-4">
+				<div>
+					<label class="block text-xs font-bold mb-1">開始日 <span class="text-red-500">*</span></label>
+					<input name="start" type="date" required class="w-full border border-black/20 rounded px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
+				</div>
+				<div>
+					<label class="block text-xs font-bold mb-1">終了日 <span class="text-red-500">*</span></label>
+					<input name="end" type="date" required class="w-full border border-black/20 rounded px-3 py-2.5 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
+				</div>
+			</div>
+
+			<!-- 免許証 -->
+			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2 mt-6">運転免許証</p>
+			<div class="grid grid-cols-2 gap-4">
+				<div>
+					<label class="block text-xs font-bold mb-1">表面 <span class="text-red-500">*</span></label>
+					<label class="license-upload-area" id="upload-front-area">
+						<input name="license_front" type="file" accept="image/*,.pdf" required class="hidden" id="license-front-input" />
+						<div class="flex flex-col items-center gap-1 text-black/40" id="upload-front-placeholder">
+							<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+							<span class="text-xs font-bold">タップして撮影/選択</span>
+						</div>
+						<img id="preview-front" class="hidden w-full h-full object-cover rounded" />
+					</label>
+				</div>
+				<div>
+					<label class="block text-xs font-bold mb-1">裏面 <span class="text-red-500">*</span></label>
+					<label class="license-upload-area" id="upload-back-area">
+						<input name="license_back" type="file" accept="image/*,.pdf" required class="hidden" id="license-back-input" />
+						<div class="flex flex-col items-center gap-1 text-black/40" id="upload-back-placeholder">
+							<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+							<span class="text-xs font-bold">タップして撮影/選択</span>
+						</div>
+						<img id="preview-back" class="hidden w-full h-full object-cover rounded" />
+					</label>
+				</div>
+			</div>
+			<p class="text-xs text-black/40">※ 画像はJPEG/PNG/WEBP/PDF（10MB以下）</p>
+
+			<!-- 貸渡契約書 -->
+			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2 mt-6">貸渡契約書</p>
+			<div class="bg-gray-50 border border-black/10 rounded-lg p-4">
+				<div class="flex items-center gap-3 mb-3">
+					<svg class="w-5 h-5 text-black/50 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+					<button type="button" id="open-yakkan-btn" class="text-sm font-bold text-orange-500 underline underline-offset-2 hover:text-orange-600 transition-colors cursor-pointer bg-transparent border-0 p-0">貸渡契約書を読む</button>
+				</div>
+				<label class="flex items-start gap-3 cursor-pointer select-none">
+					<input type="checkbox" id="yakkan-agree" class="mt-0.5 w-4 h-4 accent-orange-500 shrink-0" />
+					<span class="text-xs text-black/70 leading-relaxed">貸渡契約書の内容を確認し、<strong>同意します</strong></span>
+				</label>
+			</div>
+
+			<!-- 送信 -->
+			<div class="flex gap-3 pt-2">
+				<button type="submit" id="reserve-submit-btn" disabled class="flex-1 bg-orange-500 text-white py-3.5 font-black uppercase text-sm tracking-wider rounded hover:bg-orange-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-orange-500">予約を送信</button>
+				<button id="cancel-reserve" type="button" class="flex-1 bg-black text-white py-3.5 font-black uppercase text-sm tracking-wider rounded hover:bg-black/80 transition-colors">キャンセル</button>
+			</div>
+			<div id="reserve-message" class="text-sm mt-2 text-center font-bold"></div>
+		</form>
+	</div>
+</div>
+
+<!-- 約款モーダル -->
+<div id="yakkan-modal" class="yakkan-modal-overlay" style="display:none;">
+	<div class="yakkan-modal-box">
+		<div class="yakkan-modal-header">
+			<span class="yakkan-modal-title">貸渡契約書（約款）</span>
+			<button type="button" id="close-yakkan-btn" class="yakkan-modal-close" aria-label="閉じる">&times;</button>
+		</div>
+		<div id="yakkan-modal-body" class="yakkan-modal-body">
+			<p style="text-align:center;color:#999;">読み込み中...</p>
+		</div>
+		<div class="yakkan-modal-footer">
+			<button type="button" id="yakkan-understood-btn" class="yakkan-modal-ok-btn">確認しました</button>
+		</div>
+	</div>
+</div>
+
+</body>
+
+</html>

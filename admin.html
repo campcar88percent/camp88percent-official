@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAGO CAMP — 管理画面</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background: #f1f5f9; }
+  .status-pending { background: #fef3c7; color: #92400e; }
+  .status-confirmed { background: #d1fae5; color: #065f46; }
+  .status-cancelled { background: #fee2e2; color: #991b1b; }
+  .license-thumb { width: 120px; height: 76px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; }
+  .license-thumb:hover { transform: scale(1.05); }
+  #lightbox { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; cursor: pointer; }
+  #lightbox.active { display: flex; }
+  #lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ヘッダー -->
+<header class="bg-black text-white px-6 py-4 flex justify-between items-center shadow-lg">
+  <div>
+    <h1 class="text-lg font-black tracking-wider">NAGO.CAMP <span class="text-orange-500">ADMIN</span></h1>
+    <p class="text-xs text-white/50">予約管理システム</p>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="count-badge" class="bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">0</span>
+    <button onclick="logout()" class="text-xs text-white/60 hover:text-white">ログアウト</button>
+  </div>
+</header>
+
+<!-- ログイン画面 -->
+<div id="login-screen" class="flex items-center justify-center min-h-[80vh]">
+  <div class="bg-white rounded-xl shadow-xl p-8 w-full max-w-sm">
+    <h2 class="text-xl font-black mb-6 text-center">管理者ログイン</h2>
+    <input id="admin-pass" type="password" placeholder="パスワード" class="w-full border border-black/20 rounded px-4 py-3 mb-4 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
+    <button onclick="login()" class="w-full bg-black text-white py-3 rounded font-bold text-sm hover:bg-orange-500 transition-colors">ログイン</button>
+    <p id="login-error" class="text-red-500 text-xs mt-3 text-center hidden">パスワードが正しくありません</p>
+  </div>
+</div>
+
+<!-- 管理画面本体 (ログイン後表示) -->
+<div id="admin-panel" class="hidden">
+
+  <!-- フィルタバー -->
+  <div class="bg-white border-b px-6 py-3 flex flex-wrap gap-3 items-center">
+    <button onclick="filterStatus('all')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-black/20 hover:bg-black hover:text-white transition-colors" data-filter="all">すべて</button>
+    <button onclick="filterStatus('pending')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-yellow-400 text-yellow-700 hover:bg-yellow-400 hover:text-white transition-colors" data-filter="pending">未確認</button>
+    <button onclick="filterStatus('confirmed')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-green-400 text-green-700 hover:bg-green-400 hover:text-white transition-colors" data-filter="confirmed">確認済</button>
+    <button onclick="filterStatus('cancelled')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-red-400 text-red-700 hover:bg-red-400 hover:text-white transition-colors" data-filter="cancelled">キャンセル</button>
+    <div class="ml-auto">
+      <input id="search-input" type="text" placeholder="名前・メールで検索" class="border border-black/20 rounded px-3 py-1.5 text-xs w-48 focus:border-orange-500 outline-none" oninput="renderList()" />
+    </div>
+  </div>
+
+  <!-- 予約リスト -->
+  <div class="px-4 md:px-6 py-6">
+    <div id="reservations-list" class="space-y-4 max-w-5xl mx-auto">
+      <!-- JS で描画 -->
+    </div>
+    <p id="empty-msg" class="text-center text-black/30 text-sm mt-12 hidden">予約がありません</p>
+  </div>
+</div>
+
+<!-- ライトボックス (免許証拡大表示) -->
+<div id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="免許証" />
+</div>
+
+<script>
+let TOKEN = sessionStorage.getItem('admin_token') || '';
+let reservations = [];
+let currentFilter = 'all';
+
+// --- ログイン ---
+async function login() {
+  const pass = document.getElementById('admin-pass').value;
+  TOKEN = pass;
+  try {
+    const res = await fetch('/api/admin/reservations', {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    if (!res.ok) throw new Error();
+    sessionStorage.setItem('admin_token', TOKEN);
+    reservations = await res.json();
+    showAdmin();
+  } catch {
+    document.getElementById('login-error').classList.remove('hidden');
+  }
+}
+function logout() {
+  TOKEN = '';
+  sessionStorage.removeItem('admin_token');
+  document.getElementById('admin-panel').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('admin-pass').value = '';
+}
+
+// --- 自動ログイン ---
+(async function autoLogin() {
+  if (!TOKEN) return;
+  try {
+    const res = await fetch('/api/admin/reservations', {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    if (!res.ok) throw new Error();
+    reservations = await res.json();
+    showAdmin();
+  } catch { logout(); }
+})();
+
+function showAdmin() {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-panel').classList.remove('hidden');
+  renderList();
+}
+
+// --- フィルタ ---
+function filterStatus(status) {
+  currentFilter = status;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    b.classList.toggle('ring-2', b.dataset.filter === status);
+    b.classList.toggle('ring-orange-500', b.dataset.filter === status);
+  });
+  renderList();
+}
+
+// --- 描画 ---
+function renderList() {
+  const search = (document.getElementById('search-input')?.value || '').toLowerCase();
+  let filtered = reservations;
+  if (currentFilter !== 'all') {
+    filtered = filtered.filter(r => r.status === currentFilter);
+  }
+  if (search) {
+    filtered = filtered.filter(r =>
+      (r.name || '').toLowerCase().includes(search) ||
+      (r.email || '').toLowerCase().includes(search) ||
+      (r.phone || '').includes(search)
+    );
+  }
+
+  const container = document.getElementById('reservations-list');
+  const emptyMsg = document.getElementById('empty-msg');
+  document.getElementById('count-badge').textContent = reservations.filter(r => r.status === 'pending').length;
+
+  if (!filtered.length) {
+    container.innerHTML = '';
+    emptyMsg.classList.remove('hidden');
+    return;
+  }
+  emptyMsg.classList.add('hidden');
+
+  container.innerHTML = filtered.map(r => `
+    <div class="bg-white rounded-xl shadow-sm border border-black/5 p-5 hover:shadow-md transition-shadow">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <!-- 顧客情報 -->
+        <div class="flex-1 min-w-[200px]">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-black text-base">${esc(r.name)}</h3>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full status-${r.status}">
+              ${r.status === 'pending' ? '未確認' : r.status === 'confirmed' ? '確認済' : 'キャンセル'}
+            </span>
+          </div>
+          <div class="text-sm text-black/60 space-y-1">
+            <p>📧 ${esc(r.email)}</p>
+            <p>📱 ${esc(r.phone)}</p>
+            <p>🚐 ${esc(r.vehicle || 'ハイエース')}</p>
+          </div>
+        </div>
+
+        <!-- 日程 -->
+        <div class="text-center px-4">
+          <p class="text-xs text-black/40 font-bold uppercase mb-1">利用期間</p>
+          <p class="text-sm font-black">${r.start} <span class="text-black/30">→</span> ${r.end}</p>
+          <p class="text-xs text-black/40 mt-1">${calcNights(r.start, r.end)}泊</p>
+        </div>
+
+        <!-- 免許証 -->
+        <div class="flex gap-2">
+          ${r.licenseFront ? `<img src="/uploads/${r.licenseFront}" class="license-thumb" onclick="openLightbox('/uploads/${r.licenseFront}')" title="免許証（表）" />` : '<span class="text-xs text-black/30">表：未提出</span>'}
+          ${r.licenseBack ? `<img src="/uploads/${r.licenseBack}" class="license-thumb" onclick="openLightbox('/uploads/${r.licenseBack}')" title="免許証（裏）" />` : '<span class="text-xs text-black/30">裏：未提出</span>'}
+        </div>
+      </div>
+
+      <!-- アクション -->
+      <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-black/5">
+        ${r.status !== 'confirmed' ? `<button onclick="updateStatus('${r.id}','confirmed')" class="text-xs font-bold px-3 py-1.5 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors">✓ 確認済みにする</button>` : ''}
+        ${r.status !== 'cancelled' ? `<button onclick="updateStatus('${r.id}','cancelled')" class="text-xs font-bold px-3 py-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors">✕ キャンセル</button>` : ''}
+        ${r.status !== 'pending' ? `<button onclick="updateStatus('${r.id}','pending')" class="text-xs font-bold px-3 py-1.5 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors">↩ 未確認に戻す</button>` : ''}
+        <button onclick="deleteReservation('${r.id}')" class="text-xs font-bold px-3 py-1.5 rounded bg-black/5 text-black/40 hover:bg-red-500 hover:text-white transition-colors ml-auto">削除</button>
+        <span class="text-xs text-black/20 self-center ml-2">${new Date(r.createdAt).toLocaleString('ja-JP')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// --- ステータス更新 ---
+async function updateStatus(id, status) {
+  try {
+    const res = await fetch(`/api/admin/reservations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error();
+    const idx = reservations.findIndex(r => r.id === id);
+    if (idx !== -1) reservations[idx].status = status;
+    renderList();
+  } catch (e) { alert('更新に失敗しました'); }
+}
+
+// --- 削除 ---
+async function deleteReservation(id) {
+  if (!confirm('この予約を完全に削除しますか？（免許証画像も削除されます）')) return;
+  try {
+    const res = await fetch(`/api/admin/reservations/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    if (!res.ok) throw new Error();
+    reservations = reservations.filter(r => r.id !== id);
+    renderList();
+  } catch (e) { alert('削除に失敗しました'); }
+}
+
+// --- ライトボックス ---
+function openLightbox(src) {
+  event.stopPropagation();
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('active');
+}
+
+// --- ユーティリティ ---
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function calcNights(start, end) {
+  const ms = new Date(end) - new Date(start);
+  return Math.max(0, Math.round(ms / 86400000));
+}
+
+// Enter キーでログイン
+document.getElementById('admin-pass')?.addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
+
+// 初期フィルタ
+filterStatus('all');
+</script>
+</body>
+</html>
