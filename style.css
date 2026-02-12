@@ -533,6 +533,31 @@ header .absolute.inset-0 img {
     border-radius: 4px;
 }
 
+/* 範囲選択ハイライト */
+.cal-cell.cal-sel-start {
+    background: #f97316 !important;
+    color: #fff !important;
+    border-radius: 6px 0 0 6px;
+    z-index: 1;
+}
+.cal-cell.cal-sel-end {
+    background: #f97316 !important;
+    color: #fff !important;
+    border-radius: 0 6px 6px 0;
+    z-index: 1;
+}
+.cal-cell.cal-sel-start.cal-sel-end {
+    border-radius: 6px;
+}
+.cal-cell.cal-sel-range {
+    background: #fed7aa !important;
+    color: #9a3412 !important;
+}
+.cal-cell.cal-sel-range.booked {
+    background: #fecaca !important;
+    color: #dc2626 !important;
+}
+
 /* 月ドット */
 .cal-dot {
     width: 10px;
@@ -564,17 +589,24 @@ header .absolute.inset-0 img {
    Pricing Section
    =============================================================== */
 .pricing-card {
-    transition: transform .2s ease, border-color .2s ease;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    border-radius: 12px;
 }
 .pricing-card:hover {
     transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,.3);
 }
 .pricing-card--featured {
     background: rgba(249,115,22,.06);
 }
+.pricing-reserve-btn {
+    border-radius: 8px;
+    transition: all .2s ease;
+}
 @media (max-width: 640px) {
     #pricing h2 { font-size: 2.2rem; }
-    #pricing .text-5xl, #pricing .md\:text-6xl { font-size: 2.5rem; }
+    #pricing .text-3xl, #pricing .md\:text-4xl { font-size: 1.75rem; }
+    .pricing-card { border-radius: 10px; }
 }
 
 /* ===============================================================
