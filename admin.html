@@ -3,251 +3,428 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NAGO CAMP — 管理画面</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>NAGO.CAMP — 予約管理</title>
 <style>
-  body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background: #f1f5f9; }
-  .status-pending { background: #fef3c7; color: #92400e; }
-  .status-confirmed { background: #d1fae5; color: #065f46; }
-  .status-cancelled { background: #fee2e2; color: #991b1b; }
-  .license-thumb { width: 120px; height: 76px; object-fit: cover; border-radius: 6px; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Helvetica Neue', 'Noto Sans JP', sans-serif;
+    background: #f5f5f5; color: #111; line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: #111; color: #fff; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header h1 { font-size: 15px; font-weight: 900; letter-spacing: .06em; }
+  .header h1 span { color: #f97316; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 100px; font-size: 10px; font-weight: 700;
+  }
+  .badge-pending { background: #fef3c7; color: #92400e; }
+  .badge-confirmed { background: #d1fae5; color: #065f46; }
+  .badge-cancelled { background: #fee2e2; color: #991b1b; }
+  .btn-logout {
+    background: transparent; border: 1px solid rgba(255,255,255,.2);
+    color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 10px;
+    font-weight: 700; cursor: pointer; transition: all .15s;
+  }
+  .btn-logout:hover { background: #f97316; border-color: #f97316; }
+
+  /* ── Login ── */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: #111; display: flex; align-items: center; justify-content: center;
+  }
+  .login-box {
+    background: #fff; padding: 40px; border-radius: 12px;
+    width: 100%; max-width: 360px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
+  .login-box h2 { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+  .login-box p { font-size: 12px; color: #888; margin-bottom: 24px; }
+  .login-box input {
+    width: 100%; padding: 12px 16px; border: 2px solid #ddd; border-radius: 8px;
+    font-size: 14px; font-weight: 600; text-align: center; outline: none;
+    transition: border-color .15s;
+  }
+  .login-box input:focus { border-color: #f97316; }
+  .login-box button {
+    width: 100%; padding: 14px; margin-top: 12px; background: #111; color: #fff;
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 800;
+    cursor: pointer; letter-spacing: .05em; transition: background .15s;
+  }
+  .login-box button:hover { background: #f97316; }
+  .login-err { color: #ef4444; font-size: 12px; font-weight: 700; margin-top: 10px; }
+  .login-overlay.hidden { display: none; }
+
+  /* ── Stats Bar ── */
+  .stats-bar {
+    display: flex; gap: 16px; padding: 14px 24px; flex-wrap: wrap;
+    border-bottom: 1px solid #e5e5e5; background: #fff;
+  }
+  .stat-item {
+    display: flex; align-items: baseline; gap: 5px;
+    font-size: 11px; font-weight: 700; color: #888;
+  }
+  .stat-item strong { font-size: 20px; color: #111; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; gap: 8px; padding: 14px 24px; flex-wrap: wrap; align-items: center;
+  }
+  .filter-btn {
+    padding: 5px 14px; border: 1.5px solid #ddd; border-radius: 100px;
+    font-size: 11px; font-weight: 700; cursor: pointer; background: #fff;
+    transition: all .15s; color: #555;
+  }
+  .filter-btn:hover { border-color: #111; color: #111; }
+  .filter-btn.active { background: #111; color: #fff; border-color: #111; }
+  .search-input {
+    margin-left: auto; padding: 7px 14px; border: 1.5px solid #ddd;
+    border-radius: 8px; font-size: 12px; width: 220px; outline: none;
+    transition: border-color .15s;
+  }
+  .search-input:focus { border-color: #f97316; }
+
+  /* ── Card List ── */
+  .card-list { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: #fff; border: 1px solid #e5e5e5; border-radius: 10px;
+    overflow: hidden; transition: box-shadow .15s;
+  }
+  .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.05); }
+  .card-header {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    cursor: pointer; user-select: none;
+  }
+  .card-header:hover { background: #fafafa; }
+  .card-name { font-weight: 800; font-size: 14px; flex: 1; }
+  .card-dates { font-size: 12px; color: #666; font-weight: 600; white-space: nowrap; }
+  .card-plan {
+    font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 100px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  }
+  .plan-short { background: #f3f4f6; color: #555; }
+  .plan-medium { background: #dbeafe; color: #1d4ed8; }
+  .plan-weekly { background: #ffedd5; color: #c2410c; }
+  .card-chevron {
+    width: 18px; height: 18px; transition: transform .2s;
+    color: #ccc; flex-shrink: 0;
+  }
+  .card-chevron.open { transform: rotate(180deg); }
+
+  /* ── Card Detail ── */
+  .card-body { display: none; padding: 0 16px 16px; }
+  .card-body.open { display: block; }
+  .detail-grid {
+    display: grid; grid-template-columns: 90px 1fr;
+    gap: 3px 12px; font-size: 13px; margin-bottom: 12px;
+  }
+  .detail-label { color: #999; font-weight: 600; padding: 4px 0; }
+  .detail-value { font-weight: 600; word-break: break-all; padding: 4px 0; }
+  .detail-value a { color: #f97316; text-decoration: none; }
+  .detail-value a:hover { text-decoration: underline; }
+
+  .license-thumbs { display: flex; gap: 10px; margin-bottom: 12px; }
+  .license-thumb {
+    width: 110px; height: 70px; border-radius: 6px; border: 1px solid #e5e5e5;
+    object-fit: cover; cursor: pointer; transition: transform .15s;
+  }
   .license-thumb:hover { transform: scale(1.05); }
-  #lightbox { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; cursor: pointer; }
-  #lightbox.active { display: flex; }
-  #lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+
+  .action-bar { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid #f0f0f0; flex-wrap: wrap; }
+  .action-btn {
+    padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    cursor: pointer; border: 1.5px solid transparent; transition: all .15s;
+  }
+  .btn-confirm { background: #065f46; color: #fff; }
+  .btn-confirm:hover { background: #047857; }
+  .btn-cancel { background: #fff; border-color: #ef4444; color: #ef4444; }
+  .btn-cancel:hover { background: #fef2f2; }
+  .btn-pending { background: #fff; border-color: #f59e0b; color: #92400e; }
+  .btn-pending:hover { background: #fffbeb; }
+  .btn-delete { background: #fff; border-color: #ddd; color: #999; margin-left: auto; }
+  .btn-delete:hover { background: #fee2e2; border-color: #ef4444; color: #ef4444; }
+
+  .empty-state {
+    text-align: center; padding: 60px 24px; color: #bbb;
+    font-size: 14px; font-weight: 600;
+  }
+
+  /* ── Lightbox ── */
+  .lightbox {
+    position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.85);
+    display: none; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .lightbox.show { display: flex; }
+  .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+
+  /* ── Toast ── */
+  .toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 400; display: flex; flex-direction: column; gap: 6px; }
+  .toast {
+    background: #111; color: #fff; padding: 10px 18px; border-radius: 8px;
+    font-size: 12px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.2);
+    animation: toastIn .3s ease;
+  }
+  .toast.error { background: #ef4444; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    .stats-bar { gap: 10px; padding: 10px 16px; }
+    .stat-item strong { font-size: 17px; }
+    .toolbar { padding: 10px 16px; }
+    .search-input { width: 100%; margin-left: 0; margin-top: 4px; }
+    .card-list { padding: 0 10px 16px; }
+    .card-header { padding: 10px 12px; flex-wrap: wrap; gap: 6px; }
+    .card-body { padding: 0 12px 12px; }
+    .detail-grid { grid-template-columns: 78px 1fr; font-size: 12px; }
+    .license-thumb { width: 80px; height: 50px; }
+    .card-dates { font-size: 11px; }
+  }
 </style>
 </head>
-<body class="min-h-screen">
+<body>
 
-<!-- ヘッダー -->
-<header class="bg-black text-white px-6 py-4 flex justify-between items-center shadow-lg">
-  <div>
-    <h1 class="text-lg font-black tracking-wider">NAGO.CAMP <span class="text-orange-500">ADMIN</span></h1>
-    <p class="text-xs text-white/50">予約管理システム</p>
-  </div>
-  <div class="flex items-center gap-3">
-    <span id="count-badge" class="bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">0</span>
-    <button onclick="logout()" class="text-xs text-white/60 hover:text-white">ログアウト</button>
-  </div>
-</header>
-
-<!-- ログイン画面 -->
-<div id="login-screen" class="flex items-center justify-center min-h-[80vh]">
-  <div class="bg-white rounded-xl shadow-xl p-8 w-full max-w-sm">
-    <h2 class="text-xl font-black mb-6 text-center">管理者ログイン</h2>
-    <input id="admin-pass" type="password" placeholder="パスワード" class="w-full border border-black/20 rounded px-4 py-3 mb-4 text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none" />
-    <button onclick="login()" class="w-full bg-black text-white py-3 rounded font-bold text-sm hover:bg-orange-500 transition-colors">ログイン</button>
-    <p id="login-error" class="text-red-500 text-xs mt-3 text-center hidden">パスワードが正しくありません</p>
+<!-- Login -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>NAGO<span style="color:#f97316">.</span>CAMP</h2>
+    <p>管理画面にログイン</p>
+    <input type="password" id="login-pass" placeholder="パスワード" autocomplete="off" />
+    <button id="login-btn">ログイン</button>
+    <div class="login-err" id="login-err"></div>
   </div>
 </div>
 
-<!-- 管理画面本体 (ログイン後表示) -->
-<div id="admin-panel" class="hidden">
-
-  <!-- フィルタバー -->
-  <div class="bg-white border-b px-6 py-3 flex flex-wrap gap-3 items-center">
-    <button onclick="filterStatus('all')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-black/20 hover:bg-black hover:text-white transition-colors" data-filter="all">すべて</button>
-    <button onclick="filterStatus('pending')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-yellow-400 text-yellow-700 hover:bg-yellow-400 hover:text-white transition-colors" data-filter="pending">未確認</button>
-    <button onclick="filterStatus('confirmed')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-green-400 text-green-700 hover:bg-green-400 hover:text-white transition-colors" data-filter="confirmed">確認済</button>
-    <button onclick="filterStatus('cancelled')" class="filter-btn text-xs font-bold px-3 py-1.5 rounded-full border border-red-400 text-red-700 hover:bg-red-400 hover:text-white transition-colors" data-filter="cancelled">キャンセル</button>
-    <div class="ml-auto">
-      <input id="search-input" type="text" placeholder="名前・メールで検索" class="border border-black/20 rounded px-3 py-1.5 text-xs w-48 focus:border-orange-500 outline-none" oninput="renderList()" />
-    </div>
-  </div>
-
-  <!-- 予約リスト -->
-  <div class="px-4 md:px-6 py-6">
-    <div id="reservations-list" class="space-y-4 max-w-5xl mx-auto">
-      <!-- JS で描画 -->
-    </div>
-    <p id="empty-msg" class="text-center text-black/30 text-sm mt-12 hidden">予約がありません</p>
+<!-- Header -->
+<div class="header">
+  <h1>NAGO<span>.</span>CAMP 予約管理</h1>
+  <div class="header-right">
+    <span class="badge badge-pending" id="hdr-pending">0 受付中</span>
+    <span class="badge badge-confirmed" id="hdr-confirmed">0 確定</span>
+    <button class="btn-logout" id="btn-logout">ログアウト</button>
   </div>
 </div>
 
-<!-- ライトボックス (免許証拡大表示) -->
-<div id="lightbox" onclick="closeLightbox()">
-  <img id="lightbox-img" src="" alt="免許証" />
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat-item"><strong id="s-total">0</strong> 全予約</div>
+  <div class="stat-item"><strong id="s-pending" style="color:#f59e0b;">0</strong> 受付中</div>
+  <div class="stat-item"><strong id="s-confirmed" style="color:#059669;">0</strong> 確定</div>
+  <div class="stat-item"><strong id="s-cancelled" style="color:#ef4444;">0</strong> キャンセル</div>
 </div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="filter-btn active" data-filter="all">すべて</button>
+  <button class="filter-btn" data-filter="pending">受付中</button>
+  <button class="filter-btn" data-filter="confirmed">確定</button>
+  <button class="filter-btn" data-filter="cancelled">キャンセル</button>
+  <input type="search" class="search-input" id="search-input" placeholder="名前・メール・電話で検索…" />
+</div>
+
+<!-- Card List -->
+<div class="card-list" id="card-list"></div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox"><img id="lightbox-img" src="" alt="拡大" /></div>
+
+<!-- Toast -->
+<div class="toast-wrap" id="toast-wrap"></div>
 
 <script>
-let TOKEN = sessionStorage.getItem('admin_token') || '';
+// ── State ──
+let token = sessionStorage.getItem('admin_token') || '';
 let reservations = [];
 let currentFilter = 'all';
+let searchQuery = '';
 
-// --- ログイン ---
-async function login() {
-  const pass = document.getElementById('admin-pass').value;
-  TOKEN = pass;
+// ── DOM ──
+const $ = id => document.getElementById(id);
+const loginOverlay = $('login-overlay');
+const loginPass = $('login-pass');
+const loginBtn = $('login-btn');
+const loginErr = $('login-err');
+const cardList = $('card-list');
+const searchInput = $('search-input');
+const lightbox = $('lightbox');
+const lightboxImg = $('lightbox-img');
+
+// ── Auth ──
+if (token) { loginOverlay.classList.add('hidden'); load(); }
+
+loginBtn.addEventListener('click', tryLogin);
+loginPass.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+$('btn-logout').addEventListener('click', () => {
+  token = ''; sessionStorage.removeItem('admin_token'); location.reload();
+});
+
+async function tryLogin() {
+  const p = loginPass.value.trim();
+  if (!p) return;
+  loginErr.textContent = '';
   try {
-    const res = await fetch('/api/admin/reservations', {
-      headers: { 'Authorization': `Bearer ${TOKEN}` }
-    });
-    if (!res.ok) throw new Error();
-    sessionStorage.setItem('admin_token', TOKEN);
-    reservations = await res.json();
-    showAdmin();
-  } catch {
-    document.getElementById('login-error').classList.remove('hidden');
-  }
-}
-function logout() {
-  TOKEN = '';
-  sessionStorage.removeItem('admin_token');
-  document.getElementById('admin-panel').classList.add('hidden');
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('admin-pass').value = '';
+    const r = await fetch('/api/admin/reservations', { headers: { Authorization: `Bearer ${p}` } });
+    if (!r.ok) throw 0;
+    token = p; sessionStorage.setItem('admin_token', token);
+    loginOverlay.classList.add('hidden');
+    reservations = await r.json(); render();
+  } catch { loginErr.textContent = 'パスワードが正しくありません'; loginPass.select(); }
 }
 
-// --- 自動ログイン ---
-(async function autoLogin() {
-  if (!TOKEN) return;
+// ── Load ──
+async function load() {
   try {
-    const res = await fetch('/api/admin/reservations', {
-      headers: { 'Authorization': `Bearer ${TOKEN}` }
-    });
-    if (!res.ok) throw new Error();
-    reservations = await res.json();
-    showAdmin();
-  } catch { logout(); }
-})();
-
-function showAdmin() {
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('admin-panel').classList.remove('hidden');
-  renderList();
+    const r = await fetch('/api/admin/reservations', { headers: { Authorization: `Bearer ${token}` } });
+    if (r.status === 401) { token = ''; sessionStorage.removeItem('admin_token'); location.reload(); return; }
+    reservations = await r.json(); render();
+  } catch (e) { console.error(e); }
 }
 
-// --- フィルタ ---
-function filterStatus(status) {
-  currentFilter = status;
-  document.querySelectorAll('.filter-btn').forEach(b => {
-    b.classList.toggle('ring-2', b.dataset.filter === status);
-    b.classList.toggle('ring-orange-500', b.dataset.filter === status);
-  });
-  renderList();
+// ── Helpers ──
+function plan(s, e) {
+  const n = Math.round((new Date(e) - new Date(s)) / 864e5);
+  if (n >= 7) return { name: 'Weekly Plan', cls: 'plan-weekly', ppd: 15000, n };
+  if (n >= 4) return { name: 'Medium Plan', cls: 'plan-medium', ppd: 20000, n };
+  return { name: 'Short Stay', cls: 'plan-short', ppd: 25000, n };
 }
 
-// --- 描画 ---
-function renderList() {
-  const search = (document.getElementById('search-input')?.value || '').toLowerCase();
-  let filtered = reservations;
-  if (currentFilter !== 'all') {
-    filtered = filtered.filter(r => r.status === currentFilter);
-  }
-  if (search) {
-    filtered = filtered.filter(r =>
-      (r.name || '').toLowerCase().includes(search) ||
-      (r.email || '').toLowerCase().includes(search) ||
-      (r.phone || '').includes(search)
-    );
+function sBadge(s) {
+  const m = { pending: ['badge-pending','受付中'], confirmed: ['badge-confirmed','確定'], cancelled: ['badge-cancelled','キャンセル'] };
+  const [c, t] = m[s] || m.pending;
+  return `<span class="badge ${c}">${t}</span>`;
+}
+
+function fmtD(d) { return d ? d.replace(/-/g, '/') : '—'; }
+function fmtDT(iso) { return iso ? new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'; }
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ── Render ──
+function render() {
+  const pn = reservations.filter(r => r.status === 'pending').length;
+  const cn = reservations.filter(r => r.status === 'confirmed').length;
+  const xn = reservations.filter(r => r.status === 'cancelled').length;
+  $('s-total').textContent = reservations.length;
+  $('s-pending').textContent = pn;
+  $('s-confirmed').textContent = cn;
+  $('s-cancelled').textContent = xn;
+  $('hdr-pending').textContent = `${pn} 受付中`;
+  $('hdr-confirmed').textContent = `${cn} 確定`;
+
+  let list = [...reservations];
+  if (currentFilter !== 'all') list = list.filter(r => r.status === currentFilter);
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(r => [r.name, r.email, r.phone].some(v => (v || '').toLowerCase().includes(q)));
   }
 
-  const container = document.getElementById('reservations-list');
-  const emptyMsg = document.getElementById('empty-msg');
-  document.getElementById('count-badge').textContent = reservations.filter(r => r.status === 'pending').length;
+  if (!list.length) { cardList.innerHTML = '<div class="empty-state">予約がありません</div>'; return; }
 
-  if (!filtered.length) {
-    container.innerHTML = '';
-    emptyMsg.classList.remove('hidden');
-    return;
-  }
-  emptyMsg.classList.add('hidden');
-
-  container.innerHTML = filtered.map(r => `
-    <div class="bg-white rounded-xl shadow-sm border border-black/5 p-5 hover:shadow-md transition-shadow">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <!-- 顧客情報 -->
-        <div class="flex-1 min-w-[200px]">
-          <div class="flex items-center gap-3 mb-2">
-            <h3 class="font-black text-base">${esc(r.name)}</h3>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full status-${r.status}">
-              ${r.status === 'pending' ? '未確認' : r.status === 'confirmed' ? '確認済' : 'キャンセル'}
-            </span>
+  cardList.innerHTML = list.map(r => {
+    const p = plan(r.start, r.end);
+    const tot = p.ppd * p.n;
+    return `
+      <div class="card" data-id="${r.id}">
+        <div class="card-header" onclick="toggle('${r.id}')">
+          ${sBadge(r.status)}
+          <span class="card-name">${esc(r.name)}</span>
+          <span class="card-plan ${p.cls}">${p.name}</span>
+          <span class="card-dates">${fmtD(r.start)} → ${fmtD(r.end)}</span>
+          <svg class="card-chevron" id="ch-${r.id}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="card-body" id="bd-${r.id}">
+          <div class="detail-grid">
+            <span class="detail-label">予約ID</span><span class="detail-value" style="font-size:11px;color:#aaa;">${r.id}</span>
+            <span class="detail-label">お名前</span><span class="detail-value">${esc(r.name)}</span>
+            <span class="detail-label">メール</span><span class="detail-value"><a href="mailto:${esc(r.email)}">${esc(r.email)}</a></span>
+            <span class="detail-label">電話</span><span class="detail-value"><a href="tel:${esc(r.phone)}">${esc(r.phone)}</a></span>
+            <span class="detail-label">プラン</span><span class="detail-value" style="color:#f97316;font-weight:800;">${p.name}（${p.n}泊）</span>
+            <span class="detail-label">期間</span><span class="detail-value">${r.start} → ${r.end}</span>
+            <span class="detail-label">料金</span><span class="detail-value" style="font-size:15px;font-weight:800;">¥${tot.toLocaleString()} <span style="font-size:11px;color:#999;">(¥${p.ppd.toLocaleString()}/日)</span></span>
+            <span class="detail-label">車両</span><span class="detail-value">${esc(r.vehicle || '—')}</span>
+            <span class="detail-label">受付</span><span class="detail-value">${fmtDT(r.createdAt)}</span>
+            ${r.updatedAt ? `<span class="detail-label">更新</span><span class="detail-value">${fmtDT(r.updatedAt)}</span>` : ''}
           </div>
-          <div class="text-sm text-black/60 space-y-1">
-            <p>📧 ${esc(r.email)}</p>
-            <p>📱 ${esc(r.phone)}</p>
-            <p>🚐 ${esc(r.vehicle || 'ハイエース')}</p>
+          ${(r.licenseFront || r.licenseBack) ? `
+            <div style="font-size:11px;font-weight:700;color:#999;margin-bottom:4px;">免許証</div>
+            <div class="license-thumbs">
+              ${r.licenseFront ? `<img class="license-thumb" src="/uploads/${r.licenseFront}" alt="表" onclick="openLB('/uploads/${r.licenseFront}')" />` : ''}
+              ${r.licenseBack ? `<img class="license-thumb" src="/uploads/${r.licenseBack}" alt="裏" onclick="openLB('/uploads/${r.licenseBack}')" />` : ''}
+            </div>` : ''}
+          <div class="action-bar">
+            ${r.status !== 'confirmed' ? `<button class="action-btn btn-confirm" onclick="act('${r.id}','confirmed')">✓ 確定</button>` : ''}
+            ${r.status !== 'cancelled' ? `<button class="action-btn btn-cancel" onclick="act('${r.id}','cancelled')">✗ キャンセル</button>` : ''}
+            ${r.status !== 'pending' ? `<button class="action-btn btn-pending" onclick="act('${r.id}','pending')">↩ 受付中に戻す</button>` : ''}
+            <button class="action-btn btn-delete" onclick="del('${r.id}','${esc(r.name)}')">🗑 削除</button>
           </div>
         </div>
-
-        <!-- 日程 -->
-        <div class="text-center px-4">
-          <p class="text-xs text-black/40 font-bold uppercase mb-1">利用期間</p>
-          <p class="text-sm font-black">${r.start} <span class="text-black/30">→</span> ${r.end}</p>
-          <p class="text-xs text-black/40 mt-1">${calcNights(r.start, r.end)}泊</p>
-        </div>
-
-        <!-- 免許証 -->
-        <div class="flex gap-2">
-          ${r.licenseFront ? `<img src="/uploads/${r.licenseFront}" class="license-thumb" onclick="openLightbox('/uploads/${r.licenseFront}')" title="免許証（表）" />` : '<span class="text-xs text-black/30">表：未提出</span>'}
-          ${r.licenseBack ? `<img src="/uploads/${r.licenseBack}" class="license-thumb" onclick="openLightbox('/uploads/${r.licenseBack}')" title="免許証（裏）" />` : '<span class="text-xs text-black/30">裏：未提出</span>'}
-        </div>
-      </div>
-
-      <!-- アクション -->
-      <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-black/5">
-        ${r.status !== 'confirmed' ? `<button onclick="updateStatus('${r.id}','confirmed')" class="text-xs font-bold px-3 py-1.5 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors">✓ 確認済みにする</button>` : ''}
-        ${r.status !== 'cancelled' ? `<button onclick="updateStatus('${r.id}','cancelled')" class="text-xs font-bold px-3 py-1.5 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors">✕ キャンセル</button>` : ''}
-        ${r.status !== 'pending' ? `<button onclick="updateStatus('${r.id}','pending')" class="text-xs font-bold px-3 py-1.5 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors">↩ 未確認に戻す</button>` : ''}
-        <button onclick="deleteReservation('${r.id}')" class="text-xs font-bold px-3 py-1.5 rounded bg-black/5 text-black/40 hover:bg-red-500 hover:text-white transition-colors ml-auto">削除</button>
-        <span class="text-xs text-black/20 self-center ml-2">${new Date(r.createdAt).toLocaleString('ja-JP')}</span>
-      </div>
-    </div>
-  `).join('');
+      </div>`;
+  }).join('');
 }
 
-// --- ステータス更新 ---
-async function updateStatus(id, status) {
+// ── Toggle ──
+function toggle(id) {
+  $(`bd-${id}`).classList.toggle('open');
+  $(`ch-${id}`).classList.toggle('open');
+}
+
+// ── Actions ──
+async function act(id, status) {
   try {
-    const res = await fetch(`/api/admin/reservations/${id}`, {
+    const r = await fetch(`/api/admin/reservations/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status })
     });
-    if (!res.ok) throw new Error();
-    const idx = reservations.findIndex(r => r.id === id);
-    if (idx !== -1) reservations[idx].status = status;
-    renderList();
-  } catch (e) { alert('更新に失敗しました'); }
+    if (!r.ok) throw 0;
+    const label = { confirmed: '確定', cancelled: 'キャンセル', pending: '受付中' }[status];
+    toast(`ステータスを「${label}」に変更`);
+    load();
+  } catch { toast('操作に失敗しました', true); }
 }
 
-// --- 削除 ---
-async function deleteReservation(id) {
-  if (!confirm('この予約を完全に削除しますか？（免許証画像も削除されます）')) return;
+async function del(id, name) {
+  if (!confirm(`${name}様の予約を削除しますか？\n（免許証画像も削除されます）`)) return;
   try {
-    const res = await fetch(`/api/admin/reservations/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    const r = await fetch(`/api/admin/reservations/${id}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
     });
-    if (!res.ok) throw new Error();
-    reservations = reservations.filter(r => r.id !== id);
-    renderList();
-  } catch (e) { alert('削除に失敗しました'); }
+    if (!r.ok) throw 0;
+    toast('予約を削除しました'); load();
+  } catch { toast('削除に失敗しました', true); }
 }
 
-// --- ライトボックス ---
-function openLightbox(src) {
-  event.stopPropagation();
-  document.getElementById('lightbox-img').src = src;
-  document.getElementById('lightbox').classList.add('active');
-}
-function closeLightbox() {
-  document.getElementById('lightbox').classList.remove('active');
-}
+// ── Lightbox ──
+function openLB(src) { lightboxImg.src = src; lightbox.classList.add('show'); }
+lightbox.addEventListener('click', () => { lightbox.classList.remove('show'); lightboxImg.src = ''; });
 
-// --- ユーティリティ ---
-function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
-function calcNights(start, end) {
-  const ms = new Date(end) - new Date(start);
-  return Math.max(0, Math.round(ms / 86400000));
+// ── Toast ──
+function toast(msg, err = false) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (err ? ' error' : '');
+  el.textContent = msg;
+  $('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
 }
 
-// Enter キーでログイン
-document.getElementById('admin-pass')?.addEventListener('keypress', e => { if (e.key === 'Enter') login(); });
+// ── Filters ──
+document.querySelectorAll('.filter-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentFilter = b.dataset.filter;
+    render();
+  });
+});
+searchInput.addEventListener('input', e => { searchQuery = e.target.value; render(); });
 
-// 初期フィルタ
-filterStatus('all');
+// ── Auto-refresh 30s ──
+setInterval(() => { if (token) load(); }, 30000);
 </script>
 </body>
 </html>

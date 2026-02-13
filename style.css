@@ -35,15 +35,6 @@ html, body { overflow-x: hidden !important; }
     background-color: rgba(255, 255, 255, 0.9);
 }
 
-/* ===== アニメーション ===== */
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-.chat-bubble {
-    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 /* ===== スクロールバー ===== */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -236,9 +227,6 @@ header .absolute.inset-0 img {
     overflow: hidden;
 }
 
-/* ===== デバッグバッジ非表示 ===== */
-.local-ip-badge, #local-ip-badge, .dev-overlay, .debug-badge { display: none !important; }
-
 /* ===============================================================
    デスクトップ用メディアクエリ
    =============================================================== */
@@ -398,7 +386,7 @@ header .absolute.inset-0 img {
         max-height: none;
         object-position: center;
     }
-    img.max-w-full, img.vehicle-image {
+    img.max-w-full {
         max-width: 100% !important;
         height: auto !important;
         display: block;

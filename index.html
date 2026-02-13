@@ -23,33 +23,9 @@
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-<!-- AI機能用設定 -->
-
-<script type="importmap">
-
-{
-
-"imports": {
-
-"@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-
-"react": "https://esm.sh/react@^19.2.4",
-
-"react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-
-"react/": "https://esm.sh/react@^19.2.4/"
-
-}
-
-}
-
-</script>
-
 </head>
 
 <body class="bg-white text-black selection:bg-orange-500 selection:text-white">
-
-
 
 <!-- ナビゲーションバー -->
 
@@ -79,8 +55,6 @@
 
 </div>
 
-<!-- 予約リンク: hrefをLINEなどのURLに書き換え可能 -->
-
 <a href="#reserve" class="shrink-0 px-6 py-2 md:px-8 md:py-3 text-[10px] md:text-[11px] font-black uppercase tracking-widest bg-white text-black hover:bg-orange-500 hover:text-white transition-all shadow-lg" aria-label="予約フォームへ移動">
 
 Reserve
@@ -93,15 +67,12 @@ Reserve
 
 </nav>
 
-
-
 <!-- ヒーローセクション -->
 
 <header class="relative min-h-screen flex flex-col justify-end bg-black overflow-hidden">
 
 <div class="absolute inset-0 z-0">
 
-<!-- 【画像差し替え箇所1】 car.jpgを自分のファイル名に -->
 <img src="image/oceanhiace.jpg" alt="海辺のキャンピングカー" loading="lazy" class="w-full h-full object-cover grayscale opacity-40 contrast-125">
 
 <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
@@ -143,8 +114,6 @@ Reservation →
 </div>
 
 </header>
-
-
 
 <!-- コンセプト -->
 
@@ -194,8 +163,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 
 <div class="aspect-[4/5] overflow-hidden contrast-125 border-[15px] md:border-[30px] border-[#f8fafc] shadow-2xl relative">
 
-<!-- 【画像差し替え箇所2】 -->
-
 <img src="image/hiacein.jpeg" alt="Concept" class="w-full h-full object-cover">
 
 </div>
@@ -207,8 +174,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 </div>
 
 </section>
-
-
 
 <!-- 車両紹介 -->
 
@@ -229,8 +194,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 <div class="col-span-12 lg:col-span-7">
 
 <div class="bg-white p-1 sm:p-4 shadow-2xl border border-black/5 vehicle-wrap">
-
-<!-- 【画像差し替え箇所3】 -->
 
 <picture class="vehicle-figure">
 	<source media="(max-width:420px)" type="image/webp" srcset="image/tenkaiz-mobile.webp 1x, image/tenkaiz-mobile@2x.webp 2x">
@@ -281,8 +244,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 </div>
 <div class="col-span-12 lg:col-span-5 flex flex-col justify-center">
 
-	<!-- right-column stat cards removed (kept left-column set instead) -->
-
 	<div class="border-t-8 border-black pt-12 order-1 lg:order-2">
 
 	<h3 class="text-4xl md:text-7xl font-black uppercase mb-10 leading-none">ULTIMATE<br/>VAN LIFE</h3>
@@ -307,7 +268,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 
 </section>
 
-
 <!-- ============ PRICING ============ -->
 <section id="pricing" class="py-16 md:py-28 bg-black text-white">
 <div class="max-w-[1440px] mx-auto px-6 md:px-12">
@@ -327,7 +287,7 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 			<p class="mt-6 text-white/60 text-base md:text-lg max-w-2xl leading-relaxed">
 				ホテル代、レンタカー代、外食費と 旅のコストは積み重なる。<br/>
 				NAGO.CAMPなら<strong class="text-white">「移動・宿泊・遊ぶ」が完結</strong>。<br class="hidden md:block"/>
-				1週間プランなら<strong class="text-orange-500">1日わずか¥15,000</strong>。連泊するほどお得に、<br/>本物のバンライフが始まります。
+				1週間プランなら<strong class="text-orange-500">1日わずか¥19,000</strong>。連泊するほどお得に、<br/>本物のバンライフが始まります。
 			</p>
 		</div>
 
@@ -342,7 +302,7 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 				<span class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">Short Stay</span>
 				<h3 class="text-xl md:text-2xl font-black mt-2 mb-3">1泊〜3泊</h3>
 				<div class="flex items-baseline gap-1">
-					<span class="text-3xl md:text-4xl font-black leading-none">¥25,000</span>
+					<span class="text-3xl md:text-4xl font-black leading-none">¥26,000</span>
 					<span class="text-white/50 text-[11px] font-bold">/日（税込）</span>
 				</div>
 			</div>
@@ -360,10 +320,10 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 				<span class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/40">Medium Plan</span>
 				<h3 class="text-xl md:text-2xl font-black mt-2 mb-3">4泊〜6泊</h3>
 				<div class="flex items-baseline gap-1">
-					<span class="text-3xl md:text-4xl font-black leading-none">¥20,000</span>
+					<span class="text-3xl md:text-4xl font-black leading-none">¥22,000</span>
 					<span class="text-white/50 text-[11px] font-bold">/日（税込）</span>
 				</div>
-				<p class="mt-2 text-xs text-white/40"><del>¥100,000</del> → <strong class="text-white">¥80,000</strong><span class="text-white/40"> /4泊</span><span class="ml-1.5 text-orange-500 font-black">20%OFF</span></p>
+				<p class="mt-2 text-xs text-white/40"><del>¥104,000</del> → <strong class="text-white">¥88,000</strong><span class="text-white/40"> /4泊</span><span class="ml-1.5 text-orange-500 font-black">15%OFF</span></p>
 			</div>
 			<ul class="mt-6 space-y-2.5 text-[13px] text-white/60 flex-1">
 				<li class="flex items-start gap-2"><span class="text-orange-500 shrink-0">✓</span> Short Stay 全装備込み</li>
@@ -380,10 +340,10 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 				<span class="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-500">Weekly Plan</span>
 				<h3 class="text-xl md:text-2xl font-black mt-2 mb-3">7泊〜</h3>
 				<div class="flex items-baseline gap-1">
-					<span class="text-3xl md:text-4xl font-black leading-none text-orange-500">¥15,000</span>
+					<span class="text-3xl md:text-4xl font-black leading-none text-orange-500">¥19,000</span>
 					<span class="text-white/50 text-[11px] font-bold">/日（税込）</span>
 				</div>
-				<p class="mt-2 text-xs text-white/40"><del>¥175,000</del> → <strong class="text-white">¥105,000</strong><span class="text-white/40"> /7泊</span><span class="ml-1.5 text-orange-500 font-black">40%OFF</span></p>
+				<p class="mt-2 text-xs text-white/40"><del>¥182,000</del> → <strong class="text-white">¥133,000</strong><span class="text-white/40"> /7泊</span><span class="ml-1.5 text-orange-500 font-black">27%OFF</span></p>
 			</div>
 			<ul class="mt-6 space-y-2.5 text-[13px] text-white/60 flex-1">
 				<li class="flex items-start gap-2"><span class="text-orange-500 shrink-0">✓</span> Short Stay 全装備込み</li>
@@ -400,11 +360,152 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 		※ 全車両、大工職人が手がける無垢杉の木工シェルを搭載。高断熱パネルで外気熱をカットし、車内エアコンの効きも抜群です。「大工工法×バンライフ」— この価格で、この品質を。
 	</p>
 
+	<!-- ============ COST COMPARISON INFOGRAPHIC ============ -->
+	<div class="mt-20 md:mt-28 pt-16 md:pt-20 border-t border-white/10">
+
+		<!-- section heading -->
+		<div class="text-center mb-12 md:mb-16">
+			<span class="inline-block text-[11px] font-bold uppercase tracking-[0.25em] text-orange-500 mb-3">Cost Comparison</span>
+			<h3 class="text-3xl md:text-5xl font-black uppercase tracking-tighter leading-none mb-4">
+				「ホテル＋レンタカー」<br class="md:hidden"/>という常識を<span class="text-orange-500">疑う。</span>
+			</h3>
+			<p class="text-white/50 text-sm md:text-base max-w-2xl mx-auto leading-relaxed mt-4">
+				住むように旅をすれば、自由はもっと広がり、コストはもっとスマートに。
+			</p>
+		</div>
+
+		<!-- comparison grid: 2 columns -->
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
+
+			<!-- LEFT: 従来の旅 -->
+			<div class="relative border-2 border-white/15 rounded-2xl p-6 md:p-8 bg-white/[0.03]">
+				<div class="absolute -top-3 left-5 bg-white/10 text-white/60 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full backdrop-blur-sm">従来の沖縄旅行</div>
+
+				<!-- cost items -->
+				<div class="space-y-4 mt-4">
+					<div class="flex justify-between items-center border-b border-white/10 pb-3">
+						<span class="text-sm text-white/60 flex items-center gap-2"><span class="text-lg">🏨</span> ホテル宿泊</span>
+						<span class="text-sm font-black text-white/80">¥12,000〜</span>
+					</div>
+					<div class="flex justify-between items-center border-b border-white/10 pb-3">
+						<span class="text-sm text-white/60 flex items-center gap-2"><span class="text-lg">🚗</span> レンタカー</span>
+						<span class="text-sm font-black text-white/80">¥8,000〜</span>
+					</div>
+					<div class="flex justify-between items-center border-b border-white/10 pb-3">
+						<span class="text-sm text-white/60 flex items-center gap-2"><span class="text-lg">🍽️</span> 外食費（朝・夕）</span>
+						<span class="text-sm font-black text-white/80">¥5,000〜</span>
+					</div>
+					<div class="flex justify-between items-center border-b border-white/10 pb-3">
+						<span class="text-sm text-white/60 flex items-center gap-2"><span class="text-lg">🅿️</span> 駐車場代</span>
+						<span class="text-sm font-black text-white/80">¥1,000〜</span>
+					</div>
+					<div class="flex justify-between items-center border-b border-white/10 pb-3">
+						<span class="text-sm text-white/60 flex items-center gap-2"><span class="text-lg">⛽</span> ガソリン代</span>
+						<span class="text-sm font-black text-white/80">¥1,500〜</span>
+					</div>
+				</div>
+
+				<!-- total -->
+				<div class="mt-6 pt-4 border-t-2 border-white/15">
+					<div class="flex justify-between items-baseline">
+						<span class="text-xs font-bold uppercase tracking-wider text-white/40">1日あたり合計</span>
+						<div class="text-right">
+							<span class="text-3xl md:text-4xl font-black text-white/90">¥27,500</span>
+							<span class="text-white/40 text-xs font-bold ml-1">〜 /日</span>
+						</div>
+					</div>
+					<p class="text-right text-xs text-white/30 mt-1">7泊の場合 = <strong class="text-white/50">¥192,500〜</strong></p>
+				</div>
+
+				<!-- pain points -->
+				<div class="mt-5 space-y-1.5">
+					<p class="text-[11px] text-red-400/80 flex items-start gap-1.5"><span class="shrink-0">✕</span> チェックイン/アウトの時間制約</p>
+					<p class="text-[11px] text-red-400/80 flex items-start gap-1.5"><span class="shrink-0">✕</span> 移動と宿泊が分離 — 荷物移動の手間</p>
+					<p class="text-[11px] text-red-400/80 flex items-start gap-1.5"><span class="shrink-0">✕</span> 人気シーズンは宿が取れない</p>
+				</div>
+			</div>
+
+			<!-- RIGHT: NAGO.CAMP -->
+			<div class="relative border-2 border-orange-500 rounded-2xl p-6 md:p-8 bg-orange-500/[0.06] shadow-[0_0_40px_rgba(249,115,22,0.08)]">
+				<div class="absolute -top-3 left-5 bg-orange-500 text-black text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">NAGO.CAMP</div>
+				<div class="absolute -top-3 right-5 bg-white text-black text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">おすすめ</div>
+
+				<!-- cost items -->
+				<div class="space-y-4 mt-4">
+					<div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
+						<span class="text-sm text-white/70 flex items-center gap-2"><span class="text-lg">🚐</span> 車両レンタル</span>
+						<div class="text-right">
+							<span class="text-sm font-black text-orange-400">込み</span>
+						</div>
+					</div>
+					<div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
+						<span class="text-sm text-white/70 flex items-center gap-2"><span class="text-lg">🛏️</span> 宿泊（車中泊）</span>
+						<div class="text-right">
+							<span class="text-sm font-black text-orange-400">込み</span>
+						</div>
+					</div>
+					<div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
+						<span class="text-sm text-white/70 flex items-center gap-2"><span class="text-lg">🍳</span> キッチン設備</span>
+						<div class="text-right">
+							<span class="text-sm font-black text-orange-400">込み</span>
+						</div>
+					</div>
+					<div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
+						<span class="text-sm text-white/70 flex items-center gap-2"><span class="text-lg">🔌</span> 電源・冷蔵庫</span>
+						<div class="text-right">
+							<span class="text-sm font-black text-orange-400">込み</span>
+						</div>
+					</div>
+					<div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
+						<span class="text-sm text-white/70 flex items-center gap-2"><span class="text-lg">🌅</span> 好きな場所で宿泊</span>
+						<div class="text-right">
+							<span class="text-sm font-black text-orange-400">自由</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- total -->
+				<div class="mt-6 pt-4 border-t-2 border-orange-500/30">
+					<div class="flex justify-between items-baseline">
+						<span class="text-xs font-bold uppercase tracking-wider text-white/40">1日あたり</span>
+						<div class="text-right">
+							<span class="text-3xl md:text-4xl font-black text-orange-500">¥19,000</span>
+							<span class="text-white/40 text-xs font-bold ml-1">〜 /日</span>
+						</div>
+					</div>
+					<p class="text-right text-xs text-white/30 mt-1">7泊の場合 = <strong class="text-orange-400">¥133,000</strong></p>
+				</div>
+
+				<!-- benefits -->
+				<div class="mt-5 space-y-1.5">
+					<p class="text-[11px] text-green-400/90 flex items-start gap-1.5"><span class="shrink-0">✓</span> チェックイン/アウトなし — 完全自由行動</p>
+					<p class="text-[11px] text-green-400/90 flex items-start gap-1.5"><span class="shrink-0">✓</span> 移動＝宿泊 — 荷物はそのまま</p>
+					<p class="text-[11px] text-green-400/90 flex items-start gap-1.5"><span class="shrink-0">✓</span> 予約不要で好きな景色の前に泊まれる</p>
+				</div>
+			</div>
+
+		</div>
+
+		<!-- savings highlight bar -->
+		<div class="max-w-4xl mx-auto mt-8 md:mt-10">
+			<div class="bg-gradient-to-r from-orange-500/20 via-orange-500/10 to-orange-500/20 border border-orange-500/30 rounded-xl px-6 py-5 md:px-10 md:py-6 text-center">
+				<p class="text-white/50 text-xs font-bold uppercase tracking-wider mb-2">7泊で比較した場合の差額</p>
+				<div class="flex items-center justify-center gap-3 md:gap-5 flex-wrap">
+					<span class="text-white/40 text-sm line-through">¥192,500</span>
+					<span class="text-white/40 text-lg">→</span>
+					<span class="text-orange-500 text-2xl md:text-3xl font-black">¥133,000</span>
+					<span class="bg-orange-500 text-black text-xs md:text-sm font-black px-3 py-1.5 rounded-full">約¥59,500 おトク</span>
+				</div>
+				<p class="text-white/30 text-[11px] mt-3 max-w-lg mx-auto leading-relaxed">
+					※ 従来の旅行コストは沖縄旅行の一般的な相場から算出。実際の費用は条件により異なります。
+				</p>
+			</div>
+		</div>
+
+	</div>
+
 </div>
 </section>
-
-
-<!-- AI コンシェルジュ -->
 
 <!-- 地図セクション: 道の駅 / シャワー / 温泉 -->
 <section id="map-section" class="py-6 md:py-12 bg-white">
@@ -414,8 +515,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 				<span class="bg-number">04</span>
 				<h2 class="text-3xl md:text-6xl font-black text-black uppercase tracking-tighter leading-none">MAP<br/>SERVICES<span class="text-orange-500">.</span></h2>
 			</div>
-			<!-- filter buttons moved closer to the map (displayed over the map) -->
-			<div style="height:0"></div>
 		</div>
 
 		<div class="map-bleed">
@@ -448,8 +547,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 		<p class="map-note mt-2 md:mt-3 text-xs md:text-sm text-black/60">＊詳細は事前に各HPへご確認ください。<br/>🚿 シャワー / 🔌 電源（○=可 △=要相談 ×=不可）</p>
 	</div>
 </section>
-
-
 
 <!-- 予約カレンダー -->
 
@@ -510,8 +607,6 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 
 </section>
 
-
-
 <!-- フッター -->
 
 <footer class="bg-black text-white py-16 md:py-24">
@@ -545,11 +640,9 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 </div>
 </footer>
 
-
-
-<script type="module" src="script.js"></script>
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="script.js"></script>
 
 <!-- 予約モーダル -->
 <div id="reserve-modal" aria-hidden="true" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">

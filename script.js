@@ -85,11 +85,11 @@ function hasBookedInRange(startStr, endStr) {
 function determinePlan(startStr, endStr) {
     const nights = daysBetween(startStr, endStr) - 1;
     if (nights >= 7) {
-        return { plan: 'weekly', name: 'Weekly Plan', pricePerDay: 15000, nights };
+        return { plan: 'weekly', name: 'Weekly Plan', pricePerDay: 19000, nights };
     } else if (nights >= 4) {
-        return { plan: 'medium', name: 'Medium Plan', pricePerDay: 20000, nights };
+        return { plan: 'medium', name: 'Medium Plan', pricePerDay: 22000, nights };
     } else {
-        return { plan: 'short', name: 'Short Stay', pricePerDay: 25000, nights };
+        return { plan: 'short', name: 'Short Stay', pricePerDay: 26000, nights };
     }
 }
 
@@ -365,90 +365,7 @@ window.refreshCalendar = async function () {
 
 if (calendarEl) initCalendar();
 
-// --- 3. AI コンシェルジュ機能 ---
-const btnSend = document.getElementById('btn-send');
-const btnSelectKey = document.getElementById('btn-select-key');
-const chatInput = document.getElementById('chat-input');
-const chatBox = document.getElementById('chat-box');
-
-// APIキーの選択（既存の window.aistudio を使う UX はそのまま残す）
-if (btnSelectKey) {
-    btnSelectKey.addEventListener('click', async () => {
-        if (window.aistudio) {
-            await window.aistudio.openSelectKey();
-            btnSelectKey.innerText = 'AI CONNECTED ✔';
-            btnSelectKey.classList.replace('bg-orange-500', 'bg-black');
-            alert('AIの準備が整いました。名護の旅について質問してください！');
-        } else {
-            alert('APIキー設定環境が見つかりません。サーバー経由での利用を検討してください。');
-        }
-    });
-}
-
-// 送信ボタンが押されたとき
-async function handleSendMessage() {
-    const text = chatInput.value.trim();
-    if (!text) return;
-
-    addMessage('user', text);
-    chatInput.value = '';
-
-    const loadingId = 'loading-' + Date.now();
-    addMessage('bot', 'AIコンシェルジュがプランを練っています...', loadingId);
-
-    try {
-        // クライアント側では直接 API キーを使わず、サーバー側エンドポイントを叩く設計にする。
-        const res = await fetch('/api/genai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: text })
-        });
-
-        if (!res.ok) throw new Error('server error');
-        const data = await res.json();
-
-        const loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.remove();
-
-        addMessage('bot', data.text || '応答がありませんでした。');
-    } catch (error) {
-        console.error(error);
-        const loadingEl = document.getElementById(loadingId);
-        if (loadingEl) loadingEl.innerText = 'AI機能が利用できません。サーバー側に /api/genai エンドポイントを用意してください。';
-    }
-}
-
-// チャット吹き出しの追加
-function addMessage(role, text, id = null) {
-    const wrapper = document.createElement('div');
-    wrapper.className = `chat-bubble flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
-    if (id) wrapper.id = id;
-
-    const inner = document.createElement('div');
-    inner.className = `max-w-[90%] md:max-w-[80%] p-6 md:p-8 text-sm leading-relaxed shadow-sm ${
-        role === 'user' ? 'bg-black text-white' : 'bg-white text-black border-l-4 border-orange-500'
-    }`;
-    
-    inner.innerHTML = `
-        <div class="text-[8px] font-black uppercase tracking-widest opacity-40 mb-3">
-            ${role === 'user' ? 'Guest Query' : 'NAGO CAMP Guide'}
-        </div>
-        <div class="whitespace-pre-wrap">${text}</div>
-    `;
-
-    wrapper.appendChild(inner);
-    chatBox.appendChild(wrapper);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-if (btnSend) btnSend.addEventListener('click', handleSendMessage);
-if (chatInput) {
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSendMessage();
-    });
-}
-
-// --- 4. 予約フォームのモーダル制御 & 送信 ---
+// --- 3. 予約フォームのモーダル制御 & 送信 ---
 const openReserveBtn = document.getElementById('open-reserve');
 const reserveModal = document.getElementById('reserve-modal');
 const closeReserveBtn = document.getElementById('close-reserve');
@@ -637,90 +554,74 @@ if (reserveForm) {
     });
 }
 
-// --- 5. 地図表示 (Leaflet) と POI ピン ---
-// POI: 沖縄本島の道の駅10件（実座標）＋温泉/シャワーのサンプル
+// --- 4. 地図表示 (Leaflet) と POI データ (58件) ---
 const poiList = [
-    { id: 1, name: '道の駅 許田', category: 'michi', lat: 26.551944, lng: 127.969167, desc: '許田（きょだ） — 名護近郊の道の駅' },
-    { id: 2, name: '道の駅 おおぎみ', category: 'michi', lat: 26.660833, lng: 128.102500, desc: 'おおぎみ村の道の駅（北部）' },
-    { id: 3, name: '道の駅 いとまん', category: 'michi', lat: 26.138333, lng: 127.661111, desc: '糸満市の道の駅（南部）' },
-    { id: 4, name: '道の駅 かでな', category: 'michi', lat: 26.368056, lng: 127.774167, desc: '嘉手納町の道の駅（展望台あり）' },
-    { id: 5, name: '道の駅 喜名番所', category: 'michi', lat: 26.399444, lng: 127.758333, desc: '読谷村の道の駅（喜名番所）' },
-    { id: 6, name: '道の駅 ぎのざ', category: 'michi', lat: 26.473611, lng: 127.951944, desc: '宜野座村の道の駅（未来ぎのざ）' },
-    { id: 7, name: '道の駅 サンライズひがし', category: 'michi', lat: 26.630833, lng: 128.153611, desc: '東村の道の駅（サンライズひがし）' },
-    { id: 8, name: '道の駅 豊崎', category: 'michi', lat: 26.157778, lng: 127.655278, desc: '豊見城市の道の駅（豊崎）' },
-    { id: 9, name: '道の駅 やんばるパイナップルの丘 安波', category: 'michi', lat: 26.704444, lng: 128.280278, desc: '国頭村の道の駅（安波）' },
-    { id: 10, name: '道の駅 ゆいゆい国頭', category: 'michi', lat: 26.731944, lng: 128.169444, desc: '国頭村の道の駅（ゆいゆい国頭）' },
+    // ── 道の駅 (10件) ──
+    { id: 1,   name: '道の駅 許田',                       category: 'michi',  lat: 26.551944,  lng: 127.969167,  desc: '許田（きょだ） — 名護近郊の道の駅' },
+    { id: 2,   name: '道の駅 おおぎみ',                   category: 'michi',  lat: 26.660833,  lng: 128.102500,  desc: 'おおぎみ村の道の駅（北部）' },
+    { id: 3,   name: '道の駅 いとまん',                   category: 'michi',  lat: 26.138333,  lng: 127.661111,  desc: '糸満市の道の駅（南部）' },
+    { id: 4,   name: '道の駅 かでな',                     category: 'michi',  lat: 26.368056,  lng: 127.774167,  desc: '嘉手納町の道の駅（展望台あり）' },
+    { id: 5,   name: '道の駅 喜名番所',                   category: 'michi',  lat: 26.399444,  lng: 127.758333,  desc: '読谷村の道の駅（喜名番所）' },
+    { id: 6,   name: '道の駅 ぎのざ',                     category: 'michi',  lat: 26.473611,  lng: 127.951944,  desc: '宜野座村の道の駅（未来ぎのざ）' },
+    { id: 7,   name: '道の駅 サンライズひがし',           category: 'michi',  lat: 26.630833,  lng: 128.153611,  desc: '東村の道の駅（サンライズひがし）' },
+    { id: 8,   name: '道の駅 豊崎',                       category: 'michi',  lat: 26.157778,  lng: 127.655278,  desc: '豊見城市の道の駅（豊崎）' },
+    { id: 9,   name: '道の駅 やんばるパイナップルの丘 安波', category: 'michi', lat: 26.704444, lng: 128.280278,  desc: '国頭村の道の駅（安波）' },
+    { id: 10,  name: '道の駅 ゆいゆい国頭',               category: 'michi',  lat: 26.731944,  lng: 128.169444,  desc: '国頭村の道の駅（ゆいゆい国頭）' },
 
-    // シャワー設備（主に海水浴場） — 公開情報から主要ビーチを追加
-    { id: 11, name: 'トロピカルビーチ', category: 'shower', lat: 26.2812680, lng: 127.7316961, desc: '宜野湾トロピカルビーチ（シャワーあり）' },
-    { id: 12, name: 'アラハビーチ', category: 'shower', lat: 26.3042760, lng: 127.7585382, desc: '北谷アラハビーチ（シャワー・更衣室あり）' },
-    { id: 13, name: 'サンセットビーチ（北谷）', category: 'shower', lat: 26.3133677, lng: 127.7550856, desc: '北谷サンセットビーチ（美浜）' },
-    { id: 14, name: '波の上ビーチ', category: 'shower', lat: 26.2212939, lng: 127.6721517, desc: '那覇・波の上ビーチ（市街地のビーチ）' },
-    { id: 15, name: '新原ビーチ（みーばる）', category: 'shower', lat: 26.1336897, lng: 127.7891425, desc: '南城市 新原ビーチ（シャワーあり）' },
-    { id: 16, name: '残波ビーチ', category: 'shower', lat: 26.4353402, lng: 127.7159846, desc: '読谷村 残波ビーチ（シャワー設置）' },
+    // ── シャワー (12件) ──
+    { id: 11,  name: 'トロピカルビーチ',                   category: 'shower', lat: 26.2812680, lng: 127.7316961, desc: '宜野湾トロピカルビーチ（シャワーあり）' },
+    { id: 12,  name: 'アラハビーチ',                       category: 'shower', lat: 26.3042760, lng: 127.7585382, desc: '北谷アラハビーチ（シャワー・更衣室あり）' },
+    { id: 13,  name: 'サンセットビーチ（北谷）',           category: 'shower', lat: 26.3133677, lng: 127.7550856, desc: '北谷サンセットビーチ（美浜）' },
+    { id: 14,  name: '波の上ビーチ',                       category: 'shower', lat: 26.2212939, lng: 127.6721517, desc: '那覇・波の上ビーチ（市街地のビーチ）' },
+    { id: 15,  name: '新原ビーチ（みーばる）',             category: 'shower', lat: 26.1336897, lng: 127.7891425, desc: '南城市 新原ビーチ（シャワーあり）' },
+    { id: 16,  name: '残波ビーチ',                         category: 'shower', lat: 26.4353402, lng: 127.7159846, desc: '読谷村 残波ビーチ（シャワー設置）' },
+    { id: 28,  name: '快活CLUB 名護店',                    category: 'shower', lat: 26.6087746, lng: 127.9877215, desc: '快活CLUB 名護店 — 24時間営業のネットカフェ、シャワー有り' },
+    { id: 29,  name: '名護市 21世紀の森体育館',            category: 'shower', lat: 26.59072,   lng: 127.96925,   desc: '名護市 21世紀の森公園内の体育館（有料でシャワー利用可能）' },
+    { id: 30,  name: '瀬底ビーチ（本部町）',               category: 'shower', lat: 26.648803,  lng: 127.8550143, desc: '瀬底ビーチ — ビーチ入口にシャワー有（有料）' },
+    { id: 31,  name: 'ミッションビーチ（恩納村）',         category: 'shower', lat: 26.5187019, lng: 127.9074877, desc: 'ミッションビーチ — 温水シャワー（有料）' },
+    { id: 32,  name: '古宇利島の駅／ソラハシ',             category: 'shower', lat: 26.6932,    lng: 128.0145,    desc: '今帰仁村 古宇利島の駅（ソラハシ）— コインシャワー利用可能' },
+    { id: 33,  name: 'オクマビーチ（国頭村）',             category: 'shower', lat: 26.7420316, lng: 128.1564856, desc: 'オクマビーチ — ホテル隣接、温水シャワーあり' },
 
-    // 日帰り温泉・スパ（代表例）
-    { id: 20, name: '琉球温泉 瀨長島ホテル 龍神の湯', category: 'onsen', lat: 26.1763046, lng: 127.6414336, desc: '瀨長島ホテル内「龍神の湯」（日帰り利用可）' },
-    { id: 21, name: 'スパジャングリア', category: 'onsen', lat: 26.638800, lng: 127.9670942, desc: '北部のスパジャングリア（公的情報より）' },
-    { id: 22, name: 'ジュラ紀温泉 美ら海の湯（ホテルオリオン本部）', category: 'onsen', lat: 26.698444, lng: 127.8793577, desc: 'ホテルオリオンモトブ リゾート＆スパ内の温泉（ユーザー提供情報）' }
-    ,
-    { id: 23, name: 'TERME VILLA ちゅらーゆ', category: 'onsen', lat: 26.3130599, lng: 127.7559098, desc: '北谷・美浜のスパ施設（TERME VILLA ちゅらーゆ）' },
-    { id: 24, name: '天然温泉 さしきの猿人の湯', category: 'onsen', lat: 26.1645936, lng: 127.7706525, desc: '南城市の天然温泉 さしきの猿人の湯' },
-    
-    ,
-    { id: 26, name: '暮らしの発酵スパ（EMウェルネスリゾート コスタビスタ沖縄）', category: 'onsen', lat: 26.3062758, lng: 127.7949084, desc: 'EMウェルネスリゾート コスタビスタ沖縄（暮らしの発酵スパ）' }
-    ,
-    { id: 27, name: '沖縄かりゆしビーチリゾート・オーシャンスパ（大展望 森の湯）', category: 'onsen', lat: 26.5259482, lng: 127.9300510, desc: '恩納村 沖縄かりゆしビーチリゾート内の外来利用可能な温浴施設（大展望 森の湯）' }
+    // ── 温泉・サウナ (15件) ──
+    { id: 20,  name: '琉球温泉 瀨長島ホテル 龍神の湯',    category: 'onsen',  lat: 26.1763046, lng: 127.6414336, desc: '瀨長島ホテル内「龍神の湯」（日帰り利用可）' },
+    { id: 21,  name: 'スパジャングリア',                   category: 'onsen',  lat: 26.638800,  lng: 127.9670942, desc: '北部のスパジャングリア' },
+    { id: 22,  name: 'ジュラ紀温泉 美ら海の湯（ホテルオリオン本部）', category: 'onsen', lat: 26.698444, lng: 127.8793577, desc: 'ホテルオリオンモトブ リゾート＆スパ内の温泉' },
+    { id: 23,  name: 'TERME VILLA ちゅらーゆ',             category: 'onsen',  lat: 26.3130599, lng: 127.7559098, desc: '北谷・美浜のスパ施設（TERME VILLA ちゅらーゆ）' },
+    { id: 24,  name: '天然温泉 さしきの猿人の湯',         category: 'onsen',  lat: 26.1645936, lng: 127.7706525, desc: '南城市の天然温泉 さしきの猿人の湯' },
+    { id: 26,  name: '暮らしの発酵スパ（EMウェルネスリゾート コスタビスタ沖縄）', category: 'onsen', lat: 26.3062758, lng: 127.7949084, desc: 'EMウェルネスリゾート コスタビスタ沖縄（暮らしの発酵スパ）' },
+    { id: 27,  name: '沖縄かりゆしビーチリゾート・オーシャンスパ（大展望 森の湯）', category: 'onsen', lat: 26.5259482, lng: 127.9300510, desc: '恩納村 沖縄かりゆしビーチリゾート内の外来利用可能な温浴施設（大展望 森の湯）' },
+    { id: 34,  name: 'オクマ 展望浴場 シーサイドサウナ',   category: 'onsen',  lat: 26.7420316, lng: 128.1564856, desc: 'オクマの展望浴場「シーサイドサウナ」 — 外来利用可の想定' },
+    { id: 35,  name: '亜熱帯サウナ',                       category: 'onsen',  lat: 26.6419,    lng: 127.9521,    desc: '亜熱帯サウナ — サウナ○（要予約）' },
+    { id: 36,  name: 'タピックタラソセンター宜野座',       category: 'onsen',  lat: 26.4745,    lng: 127.9602,    desc: 'タピックタラソセンター宜野座 — サウナ○（水着着用）' },
+    { id: 37,  name: 'エナジック 天然温泉アロマ',          category: 'onsen',  lat: 26.3500,    lng: 127.7340,    desc: 'エナジック 天然温泉アロマ — サウナ○' },
+    { id: 38,  name: '伊計島温泉～黒潮の湯～',            category: 'onsen',  lat: 26.3977,    lng: 127.9914,    desc: '伊計島温泉～黒潮の湯～ — 貸切風呂（家族風呂）' },
+    { id: 39,  name: '波之上の湯',                         category: 'onsen',  lat: 26.2187,    lng: 127.6696,    desc: '波之上の湯 — サウナ○' },
+    { id: 40,  name: '三重城温泉 島人&海人の湯',           category: 'onsen',  lat: 26.2135,    lng: 127.6664,    desc: '三重城温泉 島人&海人の湯 — サウナ○' },
+    { id: 41,  name: 'ワンノサウナ',                       category: 'onsen',  lat: 26.2106,    lng: 127.6736,    desc: 'ワンノサウナ — サウナ○（個室サウナあり）' },
+
+    // ── キャンプ場 (21件) ──
+    { id: 100, name: 'アダンビーチ',                       category: 'camp',   lat: 26.8209,    lng: 128.3135,    desc: 'アダンビーチ — 🚿○ 🔌× アクティビティ×' },
+    { id: 101, name: 'やんばる学びの森',                   category: 'camp',   lat: 26.7230,    lng: 128.2650,    desc: 'やんばる学びの森 — 🚿○ 🔌× アクティビティ○' },
+    { id: 102, name: '国頭村森林公園',                     category: 'camp',   lat: 26.7331,    lng: 128.1908,    desc: '国頭村森林公園 — 🚿○ 🔌× アクティビティ○' },
+    { id: 103, name: '東村村民の森 つつじエコパーク',      category: 'camp',   lat: 26.6340,    lng: 128.1536,    desc: 'つつじエコパーク — 🚿○ 🔌○ アクティビティ○' },
+    { id: 104, name: '又吉コーヒー園',                     category: 'camp',   lat: 26.6099,    lng: 128.1439,    desc: '又吉コーヒー園 — 🚿○ 🔌○ アクティビティ○' },
+    { id: 105, name: '福地川海浜公園',                     category: 'camp',   lat: 26.6315,    lng: 128.1586,    desc: '福地川海浜公園 — 🚿○ 🔌× アクティビティ○' },
+    { id: 106, name: '屋我地ビーチ',                       category: 'camp',   lat: 26.6570,    lng: 127.9527,    desc: '屋我地ビーチ — 🚿○ 🔌× アクティビティ○' },
+    { id: 107, name: '今帰仁海辺のキャンプ場',             category: 'camp',   lat: 26.6583,    lng: 127.9905,    desc: '今帰仁海辺のキャンプ場 — 🚿○ 🔌○ アクティビティ○' },
+    { id: 108, name: '古宇利島キャンプ庭園',               category: 'camp',   lat: 26.6975,    lng: 128.0130,    desc: '古宇利島キャンプ庭園 — 🚿○ 🔌○ アクティビティ×' },
+    { id: 109, name: '今帰仁総合運動公園',                 category: 'camp',   lat: 26.6826,    lng: 127.9625,    desc: '今帰仁総合運動公園 — 🚿○ 🔌○ アクティビティ○' },
+    { id: 110, name: 'カルストキャンプサイト',             category: 'camp',   lat: 26.6688,    lng: 127.9066,    desc: 'カルストキャンプサイト — 🚿○ 🔌× アクティビティ×' },
+    { id: 111, name: '夕日の丘キャンプ場',                 category: 'camp',   lat: 26.6158,    lng: 127.9399,    desc: '夕日の丘キャンプ場 — 🚿○ 🔌× アクティビティ×' },
+    { id: 112, name: '県民の森',                           category: 'camp',   lat: 26.5112,    lng: 127.9066,    desc: '県民の森 — 🚿○ 🔌× アクティビティ○' },
+    { id: 113, name: '沖縄県総合運動公園',                 category: 'camp',   lat: 26.3285,    lng: 127.7735,    desc: '沖縄県総合運動公園 — 🚿○ 🔌× アクティビティ○' },
+    { id: 114, name: 'ユインチホテル南城 キャンプ場',      category: 'camp',   lat: 26.1657,    lng: 127.7680,    desc: 'ユインチホテル南城 — 🚿○ 🔌× アクティビティ○' },
+    { id: 115, name: 'くるくまキャンプサイト',             category: 'camp',   lat: 26.1563,    lng: 127.7960,    desc: 'くるくまキャンプサイト — 🚿○ 🔌× アクティビティ×' },
+    { id: 116, name: 'NEOSアウトドアパーク南城',           category: 'camp',   lat: 26.1753,    lng: 127.8152,    desc: 'NEOSアウトドアパーク南城 — 🚿○ 🔌○ アクティビティ○' },
+    { id: 117, name: '海ん道（うみんち）',                 category: 'camp',   lat: 26.1350,    lng: 127.6680,    desc: '海ん道（うみんち） — 🚿○ 🔌× アクティビティ○' },
+    { id: 118, name: 'いへや愛ランドよねざき',             category: 'camp',   lat: 26.9973,    lng: 127.9364,    desc: 'いへや愛ランドよねざき（伊平屋島） — 🚿○ 🔌× アクティビティ○' },
+    { id: 119, name: '伊江村青少年旅行村',                 category: 'camp',   lat: 26.7097,    lng: 127.8045,    desc: '伊江村青少年旅行村（伊江島） — 🚿○ 🔌× アクティビティ○' },
+    { id: 120, name: '粟国島オートキャンプ場',             category: 'camp',   lat: 26.5880,    lng: 127.2295,    desc: '粟国島オートキャンプ場 — 🚿○ 🔌× アクティビティ○' }
 ];
-    
-    // 北部シャワー施設・ネットカフェ等（ビーチ併設・24時間利用など）
-    poiList.push(
-        { id: 28, name: '快活CLUB 名護店', category: 'shower', lat: 26.6087746, lng: 127.9877215, desc: '快活CLUB 名護店 — 24時間営業のネットカフェ、シャワー有り' },
-        { id: 29, name: '名護市 21世紀の森体育館', category: 'shower', lat: 26.59072, lng: 127.96925, desc: '名護市 21世紀の森公園内の体育館（有料でシャワー利用可能）' },
-        { id: 30, name: '瀬底ビーチ（本部町）', category: 'shower', lat: 26.648803, lng: 127.8550143, desc: '瀬底ビーチ — ビーチ入口にシャワー有（有料）' },
-        { id: 31, name: 'ミッションビーチ（恩納村）', category: 'shower', lat: 26.5187019, lng: 127.9074877, desc: 'ミッションビーチ — 温水シャワー（有料）' },
-        { id: 32, name: '古宇利島の駅／ソラハシ', category: 'shower', lat: 26.6932, lng: 128.0145, desc: '今帰仁村 古宇利島の駅（ソラハシ）— コインシャワー利用可能' },
-        { id: 33, name: 'オクマビーチ（国頭村）', category: 'shower', lat: 26.7420316, lng: 128.1564856, desc: 'オクマビーチ — ホテル隣接、温水シャワーあり' }
-    );
-
-    // 追加：オクマ周辺のサウナ施設（正確位置は後で差し替え可能）
-    poiList.push({ id: 34, name: 'オクマ 展望浴場 シーサイドサウナ', category: 'onsen', lat: 26.7420316, lng: 128.1564856, desc: 'オクマの展望浴場「シーサイドサウナ」 — 外来利用可の想定。営業時間や料金は事前に各施設へ確認してください。' });
-
-    // --- キャンプ場 21件 ---
-    poiList.push(
-        { id: 100, name: 'アダンビーチ', category: 'camp', lat: 26.8209, lng: 128.3135, desc: 'アダンビーチ — 🚿○ 🔌× アクティビティ×' },
-        { id: 101, name: 'やんばる学びの森', category: 'camp', lat: 26.7230, lng: 128.2650, desc: 'やんばる学びの森 — 🚿○ 🔌× アクティビティ○' },
-        { id: 102, name: '国頭村森林公園', category: 'camp', lat: 26.7331, lng: 128.1908, desc: '国頭村森林公園 — 🚿○ 🔌× アクティビティ○' },
-        { id: 103, name: '東村村民の森 つつじエコパーク', category: 'camp', lat: 26.6340, lng: 128.1536, desc: 'つつじエコパーク — 🚿○ 🔌○ アクティビティ○' },
-        { id: 104, name: '又吉コーヒー園', category: 'camp', lat: 26.6099, lng: 128.1439, desc: '又吉コーヒー園 — 🚿○ 🔌○ アクティビティ○' },
-        { id: 105, name: '福地川海浜公園', category: 'camp', lat: 26.6315, lng: 128.1586, desc: '福地川海浜公園 — 🚿○ 🔌× アクティビティ○' },
-        { id: 106, name: '屋我地ビーチ', category: 'camp', lat: 26.6570, lng: 127.9527, desc: '屋我地ビーチ — 🚿○ 🔌× アクティビティ○' },
-        { id: 107, name: '今帰仁海辺のキャンプ場', category: 'camp', lat: 26.6583, lng: 127.9905, desc: '今帰仁海辺のキャンプ場 — 🚿○ 🔌○ アクティビティ○' },
-        { id: 108, name: '古宇利島キャンプ庭園', category: 'camp', lat: 26.6975, lng: 128.0130, desc: '古宇利島キャンプ庭園 — 🚿○ 🔌○ アクティビティ×' },
-        { id: 109, name: '今帰仁総合運動公園', category: 'camp', lat: 26.6826, lng: 127.9625, desc: '今帰仁総合運動公園 — 🚿○ 🔌○ アクティビティ○' },
-        { id: 110, name: 'カルストキャンプサイト', category: 'camp', lat: 26.6688, lng: 127.9066, desc: 'カルストキャンプサイト — 🚿○ 🔌× アクティビティ×' },
-        { id: 111, name: '夕日の丘キャンプ場', category: 'camp', lat: 26.6158, lng: 127.9399, desc: '夕日の丘キャンプ場 — 🚿○ 🔌× アクティビティ×' },
-        { id: 112, name: '県民の森', category: 'camp', lat: 26.5112, lng: 127.9066, desc: '県民の森 — 🚿○ 🔌× アクティビティ○' },
-        { id: 113, name: '沖縄県総合運動公園', category: 'camp', lat: 26.3285, lng: 127.7735, desc: '沖縄県総合運動公園 — 🚿○ 🔌× アクティビティ○' },
-        { id: 114, name: 'ユインチホテル南城 キャンプ場', category: 'camp', lat: 26.1657, lng: 127.7680, desc: 'ユインチホテル南城 — 🚿○ 🔌× アクティビティ○' },
-        { id: 115, name: 'くるくまキャンプサイト', category: 'camp', lat: 26.1563, lng: 127.7960, desc: 'くるくまキャンプサイト — 🚿○ 🔌× アクティビティ×' },
-        { id: 116, name: 'NEOSアウトドアパーク南城', category: 'camp', lat: 26.1753, lng: 127.8152, desc: 'NEOSアウトドアパーク南城 — 🚿○ 🔌○ アクティビティ○' },
-        { id: 117, name: '海ん道（うみんち）', category: 'camp', lat: 26.1350, lng: 127.6680, desc: '海ん道（うみんち） — 🚿○ 🔌× アクティビティ○' },
-        { id: 118, name: 'いへや愛ランドよねざき', category: 'camp', lat: 26.9973, lng: 127.9364, desc: 'いへや愛ランドよねざき（伊平屋島） — 🚿○ 🔌× アクティビティ○' },
-        { id: 119, name: '伊江村青少年旅行村', category: 'camp', lat: 26.7097, lng: 127.8045, desc: '伊江村青少年旅行村（伊江島） — 🚿○ 🔌× アクティビティ○' },
-        { id: 120, name: '粟国島オートキャンプ場', category: 'camp', lat: 26.5880, lng: 127.2295, desc: '粟国島オートキャンプ場 — 🚿○ 🔌× アクティビティ○' }
-    );
-
-    // --- 温泉・サウナ追加 ---
-    poiList.push(
-        { id: 35, name: '亜熱帯サウナ', category: 'onsen', lat: 26.6419, lng: 127.9521, desc: '亜熱帯サウナ — サウナ○（要予約）' },
-        { id: 36, name: 'タピックタラソセンター宜野座', category: 'onsen', lat: 26.4745, lng: 127.9602, desc: 'タピックタラソセンター宜野座 — サウナ○（水着着用）' },
-        { id: 37, name: 'エナジック 天然温泉アロマ', category: 'onsen', lat: 26.3500, lng: 127.7340, desc: 'エナジック 天然温泉アロマ — サウナ○' },
-        { id: 38, name: '伊計島温泉～黒潮の湯～', category: 'onsen', lat: 26.3977, lng: 127.9914, desc: '伊計島温泉～黒潮の湯～ — 貸切風呂（家族風呂）' },
-        { id: 39, name: '波之上の湯', category: 'onsen', lat: 26.2187, lng: 127.6696, desc: '波之上の湯 — サウナ○' },
-        { id: 40, name: '三重城温泉 島人&海人の湯', category: 'onsen', lat: 26.2135, lng: 127.6664, desc: '三重城温泉 島人&海人の湯 — サウナ○' },
-        { id: 41, name: 'ワンノサウナ', category: 'onsen', lat: 26.2106, lng: 127.6736, desc: 'ワンノサウナ — サウナ○（個室サウナあり）' }
-    );
 
 let map;
 const layers = { michi: L.layerGroup(), shower: L.layerGroup(), onsen: L.layerGroup(), camp: L.layerGroup() };
@@ -889,13 +790,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const filterBtns = [btnMichi, btnShower, btnOnsen, btnCamp, btnAll];
     function setPressed(active) {
-        const map = { michi: btnMichi, shower: btnShower, onsen: btnOnsen, camp: btnCamp, all: btnAll };
+        const btnMap = { michi: btnMichi, shower: btnShower, onsen: btnOnsen, camp: btnCamp, all: btnAll };
         filterBtns.forEach(b => {
             if (!b) return;
             b.setAttribute('aria-pressed', 'false');
             b.classList.remove('filter-active');
         });
-        const target = map[active];
+        const target = btnMap[active];
         if (target) {
             target.setAttribute('aria-pressed', 'true');
             target.classList.add('filter-active');
