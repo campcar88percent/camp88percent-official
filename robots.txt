@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin.html
+Disallow: /uploads/
+Disallow: /api/
+Disallow: /reservations.json
+Disallow: /server/
+
+Sitemap: https://nagocamp.com/sitemap.xml

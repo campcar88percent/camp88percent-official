@@ -289,9 +289,9 @@ async function load() {
 // ── Helpers ──
 function plan(s, e) {
   const n = Math.round((new Date(e) - new Date(s)) / 864e5);
-  if (n >= 7) return { name: 'Weekly Plan', cls: 'plan-weekly', ppd: 15000, n };
-  if (n >= 4) return { name: 'Medium Plan', cls: 'plan-medium', ppd: 20000, n };
-  return { name: 'Short Stay', cls: 'plan-short', ppd: 25000, n };
+  if (n >= 7) return { name: 'Weekly Plan', cls: 'plan-weekly', ppd: 19000, n };
+  if (n >= 4) return { name: 'Medium Plan', cls: 'plan-medium', ppd: 22000, n };
+  return { name: 'Short Stay', cls: 'plan-short', ppd: 26000, n };
 }
 
 function sBadge(s) {

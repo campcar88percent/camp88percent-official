@@ -8,7 +8,32 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>NAGO CAMP | プレミアム・キャンピングカーレンタル</title>
+<title>NAGO CAMP | 沖縄キャンピングカーレンタル — 名護発バンライフ体験</title>
+
+<meta name="description" content="沖縄・名護発のプレミアムキャンピングカーレンタル。スーパーロングハイエースで海も森も自由に旅する、ホテルいらずのバンライフ体験。1日¥19,000〜">
+
+<meta name="theme-color" content="#f97316">
+
+<link rel="canonical" href="https://nagocamp.com/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="NAGO CAMP | 沖縄キャンピングカーレンタル">
+<meta property="og:description" content="名護発・スーパーロングハイエースで海も森も自由に旅する、ホテルいらずのバンライフ体験。1日¥19,000〜">
+<meta property="og:url" content="https://nagocamp.com/">
+<meta property="og:image" content="https://nagocamp.com/image/oceanhiace.jpg">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:site_name" content="NAGO CAMP">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NAGO CAMP | 沖縄キャンピングカーレンタル">
+<meta name="twitter:description" content="名護発・スーパーロングハイエースで海も森も自由に旅する、ホテルいらずのバンライフ体験。">
+<meta name="twitter:image" content="https://nagocamp.com/image/oceanhiace.jpg">
+
+<!-- Preconnect for performance -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
 <!-- Tailwind CSS -->
 
@@ -21,15 +46,18 @@
 <link rel="stylesheet" href="style.css">
 
 <!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
 
 </head>
 
 <body class="bg-white text-black selection:bg-orange-500 selection:text-white">
 
+<!-- スキップリンク -->
+<a href="#concept" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[999] focus:bg-orange-500 focus:text-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:rounded">コンテンツへスキップ</a>
+
 <!-- ナビゲーションバー -->
 
-<nav id="navbar" class="fixed top-0 left-0 w-full z-50 transition-all duration-500 py-6 md:py-8 border-b border-transparent">
+<nav id="navbar" aria-label="メインナビゲーション" class="fixed top-0 left-0 w-full z-50 transition-all duration-500 py-6 md:py-8 border-b border-transparent">
 
 <div class="max-w-[1440px] mx-auto px-6 md:px-12 flex justify-between items-center gap-8">
 
@@ -67,13 +95,15 @@ Reserve
 
 </nav>
 
+<main>
+
 <!-- ヒーローセクション -->
 
 <header class="relative min-h-screen flex flex-col justify-end bg-black overflow-hidden">
 
 <div class="absolute inset-0 z-0">
 
-<img src="image/oceanhiace.jpg" alt="海辺のキャンピングカー" loading="lazy" class="w-full h-full object-cover grayscale opacity-40 contrast-125">
+<img src="image/oceanhiace.jpg" alt="沖縄の海辺に停めたキャンピングカー — NAGO CAMPのスーパーロングハイエース" class="w-full h-full object-cover grayscale opacity-40 contrast-125" fetchpriority="high">
 
 <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
 
@@ -609,6 +639,8 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 
 </section>
 
+</main>
+
 <!-- フッター -->
 
 <footer class="bg-black text-white py-16 md:py-24">
@@ -643,14 +675,14 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 </footer>
 
 <!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 <script type="module" src="script.js"></script>
 
 <!-- 予約モーダル -->
-<div id="reserve-modal" aria-hidden="true" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
+<div id="reserve-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="reserve-modal-title" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
 	<div class="bg-white w-full max-w-xl rounded-lg shadow-xl p-6 md:p-10 max-h-[90vh] overflow-y-auto">
 		<div class="flex justify-between items-center mb-6">
-			<h3 class="text-xl font-black">予約フォーム</h3>
+			<h3 id="reserve-modal-title" class="text-xl font-black">予約フォーム</h3>
 			<button id="close-reserve" type="button" class="text-black/60 hover:text-black text-2xl leading-none">&times;</button>
 		</div>
 		<!-- プラン表示 -->
@@ -748,10 +780,10 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 </div>
 
 <!-- 約款モーダル -->
-<div id="yakkan-modal" class="yakkan-modal-overlay" style="display:none;">
+<div id="yakkan-modal" role="dialog" aria-modal="true" aria-labelledby="yakkan-modal-title" class="yakkan-modal-overlay" style="display:none;">
 	<div class="yakkan-modal-box">
 		<div class="yakkan-modal-header">
-			<span class="yakkan-modal-title">貸渡契約書（約款）</span>
+			<span id="yakkan-modal-title" class="yakkan-modal-title">貸渡契約書（約款）</span>
 			<button type="button" id="close-yakkan-btn" class="yakkan-modal-close" aria-label="閉じる">&times;</button>
 		</div>
 		<div id="yakkan-modal-body" class="yakkan-modal-body">

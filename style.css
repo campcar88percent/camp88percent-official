@@ -1,4 +1,11 @@
 /* ===== 基本設定 ===== */
+/*
+ * !important 使用方針:
+ * - Tailwind CDN のユーティリティクラス上書きに必須
+ * - Leaflet (第三者ライブラリ) のインラインスタイル上書きに必須
+ * - メディアクエリ内での Tailwind override に必須
+ * 上記以外では !important を使用しないこと
+ */
 body {
     font-family: 'Inter', 'Noto Sans JP', sans-serif;
     scroll-behavior: smooth;

@@ -1,52 +1,117 @@
+'use strict';
+
 const express = require('express');
 require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
+const helmet = require('helmet');
+const compression = require('compression');
 
+// ======================================================
+//  定数
+// ======================================================
+const MS_PER_DAY = 86_400_000;
+const RATE_WINDOW_MS = 15 * 60 * 1000;  // 15分
+const RATE_MAX_RESERVE = 10;             // 予約API上限
+const RATE_MAX_LOGIN = 5;                // ログイン試行上限
+const RATE_CLEANUP_MS = 5 * 60 * 1000;  // クリーンアップ間隔
+const MAX_RATE_ENTRIES = 10_000;         // メモリリーク防止
+const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
+const ALLOWED_FILE_TYPES = /jpeg|jpg|png|webp|heic|pdf/i;
+
+const PORT = process.env.PORT || 3000;
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const ADMIN_PASS = process.env.ADMIN_PASS;
+
+if (!ADMIN_PASS) {
+  console.error('⛔ ADMIN_PASS が環境変数に設定されていません。サーバーを起動できません。');
+  process.exit(1);
+}
+
+// ======================================================
+//  Express アプリ初期化
+// ======================================================
 const app = express();
-app.disable('x-powered-by');
 
-// --- セキュリティヘッダー ---
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  next();
-});
+// --- Helmet（セキュリティヘッダー一括設定）---
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://*.tile.openstreetmap.org", "https://unpkg.com"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false  // Leaflet tiles 用
+}));
 
+// --- 圧縮 ---
+app.use(compression());
+
+// --- JSON パーサー ---
 app.use(express.json({ limit: '1mb' }));
 
-// --- レート制限（予約API保護） ---
+// ======================================================
+//  レート制限
+// ======================================================
 const rateLimitMap = new Map();
+
+/**
+ * IPベースのレート制限ミドルウェアを生成
+ * @param {number} windowMs - ウィンドウ（ミリ秒）
+ * @param {number} maxReqs - 最大リクエスト数
+ * @returns {Function} Express ミドルウェア
+ */
 function rateLimit(windowMs, maxReqs) {
   return (req, res, next) => {
-    const ip = req.ip;
+    if (rateLimitMap.size > MAX_RATE_ENTRIES) rateLimitMap.clear();
+    const key = `${req.ip}:${req.path}`;
     const now = Date.now();
-    const record = rateLimitMap.get(ip) || { count: 0, start: now };
+    const record = rateLimitMap.get(key) || { count: 0, start: now };
     if (now - record.start > windowMs) {
-      record.count = 1; record.start = now;
+      record.count = 1;
+      record.start = now;
     } else {
       record.count++;
     }
-    rateLimitMap.set(ip, record);
+    rateLimitMap.set(key, record);
     if (record.count > maxReqs) {
       return res.status(429).json({ error: 'リクエスト回数が上限を超えました。しばらくお待ちください。' });
     }
     next();
   };
 }
-// 古いエントリを定期的にクリーンアップ
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, rec] of rateLimitMap) {
-    if (now - rec.start > 600000) rateLimitMap.delete(ip);
-  }
-}, 300000);
 
-// --- 入力サニタイズ ---
+// 古いエントリを定期的にクリーンアップ
+const cleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [key, rec] of rateLimitMap) {
+    if (now - rec.start > RATE_CLEANUP_MS * 2) rateLimitMap.delete(key);
+  }
+}, RATE_CLEANUP_MS);
+cleanupTimer.unref();
+
+// ======================================================
+//  ユーティリティ
+// ======================================================
+
+/**
+ * XSS防止のため文字列をサニタイズ
+ * @param {*} str - 入力値
+ * @returns {string} サニタイズ済み文字列
+ */
 function sanitize(str) {
   if (typeof str !== 'string') return '';
   return str.replace(/[<>"'&]/g, c => ({
@@ -54,13 +119,40 @@ function sanitize(str) {
   })[c]).trim().slice(0, 500);
 }
 
-const PORT = process.env.PORT || 3000;
+/**
+ * 暗号学的に安全なIDを生成
+ * @returns {string} 一意のID
+ */
+function generateId() {
+  return crypto.randomUUID();
+}
 
-// --- メール設定 ---
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '88per88cent@gmail.com';
-const SMTP_USER = process.env.SMTP_USER || '88per88cent@gmail.com';
-const SMTP_PASS = process.env.SMTP_PASS || ''; // Gmail アプリパスワード
+/**
+ * タイミング安全な文字列比較
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function safeCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
+/**
+ * 電話番号の形式を検証
+ * @param {string} phone
+ * @returns {boolean}
+ */
+function isValidPhone(phone) {
+  return /^[\d\-+() ]{8,20}$/.test(phone);
+}
+
+// ======================================================
+//  メール設定
+// ======================================================
 let transporter = null;
 if (SMTP_PASS) {
   transporter = nodemailer.createTransport({
@@ -68,22 +160,34 @@ if (SMTP_PASS) {
     auth: { user: SMTP_USER, pass: SMTP_PASS }
   });
   transporter.verify((err) => {
-    if (err) console.error('SMTP 接続エラー:', err.message);
-    else console.log('✉  SMTP 接続OK — メール通知有効');
+    if (err) console.error('[MAIL] SMTP 接続エラー:', err.message);
+    else console.log('[MAIL] SMTP 接続OK — メール通知有効');
   });
 } else {
-  console.log('⚠  SMTP_PASS 未設定 — メール通知は無効（予約は保存されます）');
+  console.log('[MAIL] SMTP_PASS 未設定 — メール通知は無効（予約は保存されます）');
 }
 
-// プラン判定
+// ======================================================
+//  ビジネスロジック
+// ======================================================
+
+/**
+ * 宿泊日数からプランと日額を判定
+ * @param {string} start - YYYY-MM-DD
+ * @param {string} end - YYYY-MM-DD
+ * @returns {{ name: string, pricePerDay: number, nights: number }}
+ */
 function determinePlan(start, end) {
-  const nights = Math.round((new Date(end) - new Date(start)) / 86400000);
+  const nights = Math.round((new Date(end) - new Date(start)) / MS_PER_DAY);
   if (nights >= 7) return { name: 'Weekly Plan', pricePerDay: 19000, nights };
   if (nights >= 4) return { name: 'Medium Plan', pricePerDay: 22000, nights };
   return { name: 'Short Stay', pricePerDay: 26000, nights };
 }
 
-// 予約通知メール送信
+/**
+ * 予約通知メール送信（管理者宛て）
+ * @param {Object} entry - 予約データ
+ */
 async function sendReservationEmail(entry) {
   if (!transporter) return;
   const plan = determinePlan(entry.start, entry.end);
@@ -107,7 +211,7 @@ async function sendReservationEmail(entry) {
           <tr><td style="padding:8px 0;color:#888;">受付日時</td><td style="padding:8px 0;">${new Date(entry.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td></tr>
         </table>
         <div style="margin-top:20px;text-align:center;">
-          <a href="${process.env.BASE_URL || 'http://localhost:3000'}/admin.html" style="display:inline-block;background:#111;color:#fff;padding:12px 28px;text-decoration:none;font-size:13px;font-weight:700;border-radius:6px;letter-spacing:.05em;">管理画面を開く →</a>
+          <a href="${BASE_URL}/admin.html" style="display:inline-block;background:#111;color:#fff;padding:12px 28px;text-decoration:none;font-size:13px;font-weight:700;border-radius:6px;letter-spacing:.05em;">管理画面を開く →</a>
         </div>
       </div>
       <div style="background:#f8f8f8;padding:12px 24px;text-align:center;font-size:11px;color:#aaa;">
@@ -123,59 +227,48 @@ async function sendReservationEmail(entry) {
       subject: `【新規予約】${entry.name}様 ${entry.start}〜${entry.end}（${plan.name}）`,
       html
     });
-    console.log(`✉  予約通知メール送信完了 → ${ADMIN_EMAIL}`);
+    console.log(`[MAIL] 予約通知メール送信完了 → ${ADMIN_EMAIL}`);
   } catch (err) {
-    console.error('メール送信エラー:', err.message);
+    console.error('[MAIL] メール送信エラー:', err.message);
   }
 }
 
-// --- ファイルパス ---
+// ======================================================
+//  データストア（JSONファイル）
+// ======================================================
 const reservationsFile = path.join(__dirname, '..', 'reservations.json');
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-// --- 管理者パスワード (本番では環境変数を使用) ---
-const ADMIN_PASS = process.env.ADMIN_PASS || 'nagocamp2026';
-
-// --- Multer 設定 (免許証アップロード) ---
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    const prefix = file.fieldname; // license_front or license_back
-    cb(null, `${prefix}_${Date.now()}${ext}`);
-  }
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|webp|heic|pdf/i;
-    const ext = path.extname(file.originalname).replace('.', '');
-    if (allowed.test(ext) || allowed.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('許可されていないファイル形式です'));
-    }
-  }
-});
-
-// --- ヘルパー: 予約データ読み書き ---
-function readReservations() {
+/** 予約データを非同期で読み込み */
+async function readReservations() {
   try {
     if (fs.existsSync(reservationsFile)) {
-      return JSON.parse(fs.readFileSync(reservationsFile, 'utf8') || '[]');
+      const data = await fs.promises.readFile(reservationsFile, 'utf8');
+      return JSON.parse(data || '[]');
     }
-  } catch (e) { console.error('read reservations err', e); }
+  } catch (e) {
+    console.error('[DATA] 予約データ読み込みエラー:', e.message);
+  }
   return [];
 }
-function writeReservations(list) {
-  fs.writeFileSync(reservationsFile, JSON.stringify(list, null, 2), 'utf8');
+
+/** 予約データを非同期で書き込み（アトミック書き込み） */
+async function writeReservations(list) {
+  const tmpFile = reservationsFile + '.tmp';
+  await fs.promises.writeFile(tmpFile, JSON.stringify(list, null, 2), 'utf8');
+  await fs.promises.rename(tmpFile, reservationsFile);
 }
 
-// --- ダブルブッキングチェック ---
-function hasConflict(start, end, excludeId) {
-  const list = readReservations();
+/**
+ * ダブルブッキングチェック
+ * @param {string} start - YYYY-MM-DD
+ * @param {string} end - YYYY-MM-DD
+ * @param {string} [excludeId] - 除外するID
+ * @param {Array} list - 予約リスト
+ * @returns {boolean}
+ */
+function hasConflict(start, end, excludeId, list) {
   const s = new Date(start).getTime();
   const e = new Date(end).getTime();
   return list.some(r => {
@@ -183,109 +276,169 @@ function hasConflict(start, end, excludeId) {
     if (r.status === 'cancelled') return false;
     const rs = new Date(r.start).getTime();
     const re = new Date(r.end).getTime();
-    return s < re && e > rs; // 期間が重なる
+    return s < re && e > rs;
   });
 }
 
-// --- 管理者認証ミドルウェア ---
+// ======================================================
+//  Multer 設定（免許証アップロード）
+// ======================================================
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const safeName = `${file.fieldname}_${crypto.randomBytes(8).toString('hex')}${ext}`;
+    cb(null, safeName);
+  }
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: FILE_SIZE_LIMIT },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).replace('.', '').toLowerCase();
+    if (ALLOWED_FILE_TYPES.test(ext) || ALLOWED_FILE_TYPES.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('許可されていないファイル形式です'));
+    }
+  }
+});
+
+// ======================================================
+//  認証ミドルウェア
+// ======================================================
+
+/**
+ * 管理者認証（タイミング安全比較）
+ */
 function adminAuth(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth || auth !== `Bearer ${ADMIN_PASS}`) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!safeCompare(token, ADMIN_PASS)) {
     return res.status(401).json({ error: '管理者認証が必要です' });
   }
   next();
 }
 
-// 静的ファイルをルートから配信（.env, .git, uploads を除外）
+// ======================================================
+//  静的ファイル配信
+// ======================================================
 app.use(express.static(path.join(__dirname, '..'), {
   dotfiles: 'deny',
-  index: 'index.html'
+  index: 'index.html',
+  maxAge: '7d',            // 静的ファイルのキャッシュ
+  etag: true,
+  setHeaders: (res, filePath) => {
+    // HTML は常に最新を取得
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }
 }));
+
 // アップロードファイルは管理者認証必須
 app.use('/uploads', adminAuth, express.static(uploadsDir));
+
+// ======================================================
+//  ヘルスチェック
+// ======================================================
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // ======================================================
 //  予約 API
 // ======================================================
 
-// 予約済み日付を返す (カレンダー表示用)
-app.get('/api/reservations/dates', (req, res) => {
-  const list = readReservations().filter(r => r.status !== 'cancelled');
-  const booked = [];
-  list.forEach(r => {
-    const s = new Date(r.start);
-    const e = new Date(r.end);
-    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-      booked.push(d.toISOString().slice(0, 10));
+// 予約済み日付を返す（カレンダー表示用）
+app.get('/api/reservations/dates', async (req, res, next) => {
+  try {
+    const list = (await readReservations()).filter(r => r.status !== 'cancelled');
+    const booked = new Set();
+    for (const r of list) {
+      const s = new Date(r.start);
+      const e = new Date(r.end);
+      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+        booked.add(d.toISOString().slice(0, 10));
+      }
     }
-  });
-  res.json({ booked: [...new Set(booked)] });
+    res.json({ booked: [...booked] });
+  } catch (err) {
+    next(err);
+  }
 });
 
-// 予約送信 (免許証画像付き) — レート制限: 15分に10件まで
+// 予約送信（免許証画像付き）— レート制限付き
 app.post('/api/reserve',
-  rateLimit(15 * 60 * 1000, 10),
+  rateLimit(RATE_WINDOW_MS, RATE_MAX_RESERVE),
   upload.fields([
     { name: 'license_front', maxCount: 1 },
     { name: 'license_back', maxCount: 1 }
   ]),
-  (req, res) => {
-    const name = sanitize(req.body?.name);
-    const email = sanitize(req.body?.email);
-    const phone = sanitize(req.body?.phone);
-    const start = sanitize(req.body?.start);
-    const end = sanitize(req.body?.end);
-    if (!name || !email || !phone || !start || !end) {
-      return res.status(400).json({ error: '必須項目が不足しています' });
-    }
-    // メール形式チェック
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: '有効なメールアドレスを入力してください' });
-    }
-    // 日付形式チェック
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
-      return res.status(400).json({ error: '日付形式が不正です' });
-    }
-    if (new Date(start) > new Date(end)) {
-      return res.status(400).json({ error: '終了日は開始日以降にしてください' });
-    }
-    // 過去の日付チェック
-    const today = new Date(); today.setHours(0,0,0,0);
-    if (new Date(start) < today) {
-      return res.status(400).json({ error: '過去の日付は指定できません' });
-    }
+  async (req, res, next) => {
+    try {
+      const name = sanitize(req.body?.name);
+      const email = sanitize(req.body?.email);
+      const phone = sanitize(req.body?.phone);
+      const start = sanitize(req.body?.start);
+      const end = sanitize(req.body?.end);
 
-    // ダブルブッキングチェック
-    if (hasConflict(start, end)) {
-      return res.status(409).json({ error: 'ご指定の日程は既に予約済みです。別の日程をお選びください。' });
+      // 必須項目チェック
+      if (!name || !email || !phone || !start || !end) {
+        return res.status(400).json({ error: '必須項目が不足しています' });
+      }
+      // メール形式チェック
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: '有効なメールアドレスを入力してください' });
+      }
+      // 電話番号チェック
+      if (!isValidPhone(phone)) {
+        return res.status(400).json({ error: '有効な電話番号を入力してください' });
+      }
+      // 日付形式チェック
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+        return res.status(400).json({ error: '日付形式が不正です' });
+      }
+      if (new Date(start) > new Date(end)) {
+        return res.status(400).json({ error: '終了日は開始日以降にしてください' });
+      }
+      // 過去の日付チェック
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (new Date(start) < today) {
+        return res.status(400).json({ error: '過去の日付は指定できません' });
+      }
+
+      // ダブルブッキングチェック
+      const list = await readReservations();
+      if (hasConflict(start, end, null, list)) {
+        return res.status(409).json({ error: 'ご指定の日程は既に予約済みです。別の日程をお選びください。' });
+      }
+
+      const entry = {
+        id: generateId(),
+        name,
+        email,
+        phone,
+        start,
+        end,
+        vehicle: 'スーパーロングハイエース',
+        licenseFront: req.files?.license_front?.[0]?.filename || null,
+        licenseBack: req.files?.license_back?.[0]?.filename || null,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+
+      list.push(entry);
+      await writeReservations(list);
+
+      // メール通知（非同期・エラーでも予約は成功）
+      sendReservationEmail(entry).catch(err => console.error('[MAIL] err:', err.message));
+
+      res.json({ ok: true, id: entry.id, message: '予約を受け付けました。確認メールをお送りします。' });
+    } catch (err) {
+      next(err);
     }
-
-    // 免許証ファイル名
-    const licenseFront = req.files?.license_front?.[0]?.filename || null;
-    const licenseBack = req.files?.license_back?.[0]?.filename || null;
-
-    const entry = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      name,
-      email,
-      phone,
-      start,
-      end,
-      vehicle: 'スーパーロングハイエース',
-      licenseFront,
-      licenseBack,
-      status: 'pending',   // pending | confirmed | cancelled
-      createdAt: new Date().toISOString()
-    };
-
-    const list = readReservations();
-    list.push(entry);
-    writeReservations(list);
-
-    // メール通知（非同期・エラーでも予約は成功）
-    sendReservationEmail(entry).catch(err => console.error('mail err', err));
-
-    res.json({ ok: true, id: entry.id, message: '予約を受け付けました。確認メールをお送りします。' });
   }
 );
 
@@ -293,45 +446,117 @@ app.post('/api/reserve',
 //  管理者 API
 // ======================================================
 
+// 管理者ログイン検証（レート制限付き）
+app.post('/api/admin/login',
+  rateLimit(RATE_WINDOW_MS, RATE_MAX_LOGIN),
+  (req, res) => {
+    const { password } = req.body || {};
+    if (!password || !safeCompare(password, ADMIN_PASS)) {
+      return res.status(401).json({ error: 'パスワードが正しくありません' });
+    }
+    res.json({ ok: true });
+  }
+);
+
 // 全予約取得
-app.get('/api/admin/reservations', adminAuth, (req, res) => {
-  const list = readReservations().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json(list);
+app.get('/api/admin/reservations', adminAuth, async (req, res, next) => {
+  try {
+    const list = (await readReservations()).sort((a, b) =>
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // 予約ステータス更新
-app.patch('/api/admin/reservations/:id', adminAuth, (req, res) => {
-  const { status } = req.body;
-  if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
-    return res.status(400).json({ error: '無効なステータス' });
+app.patch('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ error: '無効なステータス' });
+    }
+    const list = await readReservations();
+    const idx = list.findIndex(r => r.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: '予約が見つかりません' });
+    list[idx].status = status;
+    list[idx].updatedAt = new Date().toISOString();
+    await writeReservations(list);
+    res.json({ ok: true, reservation: list[idx] });
+  } catch (err) {
+    next(err);
   }
-  const list = readReservations();
-  const idx = list.findIndex(r => r.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: '予約が見つかりません' });
-  list[idx].status = status;
-  list[idx].updatedAt = new Date().toISOString();
-  writeReservations(list);
-  res.json({ ok: true, reservation: list[idx] });
 });
 
 // 予約削除
-app.delete('/api/admin/reservations/:id', adminAuth, (req, res) => {
-  let list = readReservations();
-  const target = list.find(r => r.id === req.params.id);
-  if (!target) return res.status(404).json({ error: '予約が見つかりません' });
-  // 関連ファイル削除
-  [target.licenseFront, target.licenseBack].forEach(f => {
-    if (f) {
-      const fp = path.join(uploadsDir, f);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+app.delete('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
+  try {
+    let list = await readReservations();
+    const target = list.find(r => r.id === req.params.id);
+    if (!target) return res.status(404).json({ error: '予約が見つかりません' });
+    // 関連ファイル削除
+    for (const f of [target.licenseFront, target.licenseBack]) {
+      if (f) {
+        const fp = path.join(uploadsDir, f);
+        try { await fs.promises.unlink(fp); } catch { /* ファイルが存在しない場合は無視 */ }
+      }
     }
-  });
-  list = list.filter(r => r.id !== req.params.id);
-  writeReservations(list);
-  res.json({ ok: true });
+    list = list.filter(r => r.id !== req.params.id);
+    await writeReservations(list);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
 });
 
-// Bind to 0.0.0.0 so other devices on the LAN can connect
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running: http://0.0.0.0:${PORT}`);
+// ======================================================
+//  404 ハンドラ
+// ======================================================
+app.use((_req, res) => {
+  res.status(404).json({ error: 'ページが見つかりません' });
 });
+
+// ======================================================
+//  グローバルエラーハンドラ
+// ======================================================
+app.use((err, _req, res, _next) => {
+  // Multer エラー
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'ファイルサイズが上限（10MB）を超えています' });
+    }
+    return res.status(400).json({ error: `アップロードエラー: ${err.message}` });
+  }
+  // バリデーションエラー
+  if (err.message === '許可されていないファイル形式です') {
+    return res.status(400).json({ error: err.message });
+  }
+  // それ以外の予期しないエラー
+  console.error('[ERROR]', err.stack || err.message);
+  res.status(500).json({ error: 'サーバーエラーが発生しました。しばらくしてからお試しください。' });
+});
+
+// ======================================================
+//  サーバー起動 & グレースフルシャットダウン
+// ======================================================
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[SERVER] Running: http://0.0.0.0:${PORT}`);
+});
+
+function gracefulShutdown(signal) {
+  console.log(`\n[SERVER] ${signal} 受信 — シャットダウン中...`);
+  server.close(() => {
+    clearInterval(cleanupTimer);
+    console.log('[SERVER] 正常終了');
+    process.exit(0);
+  });
+  // 10秒以内に終了しなければ強制終了
+  setTimeout(() => {
+    console.error('[SERVER] 強制終了');
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
