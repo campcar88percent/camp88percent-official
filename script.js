@@ -817,3 +817,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+// ======================================================
+//  お問い合わせフォーム
+// ======================================================
+(function initContactForm() {
+    const form = document.getElementById('contact-form');
+    if (!form) return;
+
+    const submitBtn = document.getElementById('contact-submit-btn');
+    const resultEl = document.getElementById('contact-message-result');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (submitBtn.disabled) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = '送信中...';
+        resultEl.textContent = '';
+        resultEl.className = 'text-sm font-bold text-center';
+
+        const data = {
+            name: form.name.value.trim(),
+            email: form.email.value.trim(),
+            subject: form.subject.value.trim(),
+            message: form.message.value.trim()
+        };
+
+        try {
+            const res = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+
+            if (res.ok && json.ok) {
+                resultEl.textContent = 'お問い合わせを送信しました。確認メールをご確認ください。';
+                resultEl.classList.add('text-green-600');
+                form.reset();
+            } else {
+                resultEl.textContent = json.error || '送信に失敗しました。';
+                resultEl.classList.add('text-red-500');
+            }
+        } catch {
+            resultEl.textContent = '通信エラーが発生しました。しばらくしてからお試しください。';
+            resultEl.classList.add('text-red-500');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send Message';
+        }
+    });
+})();

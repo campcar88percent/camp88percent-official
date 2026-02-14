@@ -443,6 +443,139 @@ app.post('/api/reserve',
 );
 
 // ======================================================
+//  お問い合わせ API
+// ======================================================
+const RATE_MAX_CONTACT = 5; // 15分間に5件まで
+
+/**
+ * お問い合わせ自動返信メール送信（送信者宛て）
+ * @param {Object} data - { name, email, subject, message }
+ */
+async function sendContactAutoReply(data) {
+  if (!transporter) return;
+  const text = `${data.name}様　お問い合わせありがとうございます。
+
+お問い合わせ内容
+----------------------------
+お名前
+${data.name}
+
+メールアドレス
+${data.email}
+
+題名
+${data.subject}
+
+メッセージ本文
+${data.message}
+
+----------------------------
+
+お問い合わせありがとうございました。
+折り返し担当者よりご連絡させていただきますので、
+しばらくお待ちください。
+
+＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
+株式会社88PERCENT　NAGO.CAMPレンタルシステム
+担当：鈴木　　mobile：080-85200-6929
+${BASE_URL}
+お問合せ 88per88cent@gmail.com
+営業時間 9 時〜18 時（年中無休）
+＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
+
+本メールは 88PERCENT　NAGO.CAMPレンタルシステム（${BASE_URL}）のお問い合わせフォームから送信されました`;
+
+  try {
+    await transporter.sendMail({
+      from: `"NAGO.CAMP" <${SMTP_USER}>`,
+      to: data.email,
+      subject: `【NAGO.CAMP】お問い合わせありがとうございます — ${data.subject}`,
+      text
+    });
+    console.log(`[MAIL] お問い合わせ自動返信送信完了 → ${data.email}`);
+  } catch (err) {
+    console.error('[MAIL] お問い合わせ自動返信エラー:', err.message);
+  }
+}
+
+/**
+ * お問い合わせ通知メール送信（管理者宛て）
+ * @param {Object} data - { name, email, subject, message }
+ */
+async function sendContactNotification(data) {
+  if (!transporter || !ADMIN_EMAIL) return;
+  const html = `
+    <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;border:2px solid #111;border-radius:8px;overflow:hidden;">
+      <div style="background:#111;color:#fff;padding:20px 24px;">
+        <h1 style="margin:0;font-size:20px;letter-spacing:.05em;">✉️ NAGO.CAMP — 新規お問い合わせ</h1>
+      </div>
+      <div style="padding:24px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="padding:8px 0;color:#888;width:100px;">お名前</td><td style="padding:8px 0;font-weight:700;">${sanitize(data.name)}</td></tr>
+          <tr><td style="padding:8px 0;color:#888;">メール</td><td style="padding:8px 0;"><a href="mailto:${sanitize(data.email)}">${sanitize(data.email)}</a></td></tr>
+          <tr><td style="padding:8px 0;color:#888;">題名</td><td style="padding:8px 0;font-weight:700;">${sanitize(data.subject)}</td></tr>
+          <tr style="border-top:1px solid #eee;"><td style="padding:12px 0 8px;color:#888;vertical-align:top;">本文</td><td style="padding:12px 0 8px;white-space:pre-wrap;">${sanitize(data.message)}</td></tr>
+          <tr><td style="padding:8px 0;color:#888;">受信日時</td><td style="padding:8px 0;">${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td></tr>
+        </table>
+        <div style="margin-top:20px;text-align:center;">
+          <a href="mailto:${sanitize(data.email)}?subject=Re: ${encodeURIComponent(data.subject)}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;text-decoration:none;font-size:13px;font-weight:700;border-radius:6px;letter-spacing:.05em;">返信する →</a>
+        </div>
+      </div>
+      <div style="background:#f8f8f8;padding:12px 24px;text-align:center;font-size:11px;color:#aaa;">
+        NAGO.CAMP Contact Form
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"NAGO.CAMP" <${SMTP_USER}>`,
+      to: ADMIN_EMAIL,
+      replyTo: data.email,
+      subject: `【お問い合わせ】${data.name}様 — ${data.subject}`,
+      html
+    });
+    console.log(`[MAIL] お問い合わせ管理者通知送信完了 → ${ADMIN_EMAIL}`);
+  } catch (err) {
+    console.error('[MAIL] お問い合わせ管理者通知エラー:', err.message);
+  }
+}
+
+// お問い合わせ送信 — レート制限付き
+app.post('/api/contact',
+  rateLimit(RATE_WINDOW_MS, RATE_MAX_CONTACT),
+  async (req, res, next) => {
+    try {
+      const name = sanitize(req.body?.name);
+      const email = sanitize(req.body?.email);
+      const subject = sanitize(req.body?.subject);
+      const message = (typeof req.body?.message === 'string' ? req.body.message : '').trim().slice(0, 5000);
+
+      // 必須項目チェック
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ error: '必須項目が不足しています' });
+      }
+      // メール形式チェック
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: '有効なメールアドレスを入力してください' });
+      }
+
+      const data = { name, email, subject, message };
+
+      // 自動返信（送信者宛て）＋ 管理者通知を並行送信
+      await Promise.allSettled([
+        sendContactAutoReply(data),
+        sendContactNotification(data)
+      ]);
+
+      res.json({ ok: true, message: 'お問い合わせを送信しました。確認メールをお送りしましたのでご確認ください。' });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ======================================================
 //  管理者 API
 // ======================================================
 
