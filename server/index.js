@@ -7,7 +7,6 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', 1); // Render等リバースプロキシ対応
 
 // --- セキュリティヘッダー ---
 app.use((req, res, next) => {
@@ -332,7 +331,7 @@ app.delete('/api/admin/reservations/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-const HOST = process.env.HOST || '0.0.0.0';
-app.listen(PORT, HOST, () => {
-  console.log(`Server running: http://${HOST}:${PORT}`);
+// Bind to 0.0.0.0 so other devices on the LAN can connect
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running: http://0.0.0.0:${PORT}`);
 });
