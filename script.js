@@ -4,7 +4,7 @@
 // 予約済み日程: booked-dates.json (GitHub静的ファイル)
 // ======================================================
 
-const WEB3FORMS_KEY = '9cb2fdbf-a038-41b0-a4f5-fe732eec8a26';
+const WEB3FORMS_KEY = '020615cb-3610-4daf-a37c-d46f9f5dbf78';
 // ↑ Web3Formsの画面に表示されたAPIキー全体をコピーして貼り付けてください
 
 // --- 1. ナビゲーションのスクロール制御 ---
