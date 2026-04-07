@@ -4,3 +4,4 @@ uploads/
 reservations.json
 .DS_Store
 *.log
+.claude/
