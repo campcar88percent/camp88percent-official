@@ -1,5 +1,5 @@
 // ======================================================
-// NAGO CAMP — script.js
+// 88CAMPCAR — script.js
 // 予約フォーム & お問い合わせ: Web3Forms
 // 予約済み日程: booked-dates.json (GitHub静的ファイル)
 // ======================================================
@@ -447,13 +447,13 @@ if (reserveForm) {
         // Web3Formsに送信（免許証はファイル名のみ記載・別途Google Driveで受け取る）
         const payload = {
             access_key: WEB3FORMS_KEY,
-            subject: `【NAGO CAMP 予約申込】${name}様 ${formatDateJP(start)}〜${formatDateJP(end)}`,
-            from_name: 'NAGO CAMP 予約システム',
+            subject: `〆88CAMPCAR 予約申込〇${name}様 ${formatDateJP(start)}～${formatDateJP(end)}`,
+            from_name: '88CAMPCAR 予約システム',
             name: name,
             email: email,
             message: `
 ━━━━━━━━━━━━━━━━━━━━
-NAGO CAMP 予約申込
+88CAMPCAR 予約申込
 ━━━━━━━━━━━━━━━━━━━━
 【お客様情報】
 お名前：${name}
@@ -675,8 +675,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const payload = {
             access_key: WEB3FORMS_KEY,
-            subject: `【NAGO CAMP お問い合わせ】${form.name.value.trim()}様`,
-            from_name: 'NAGO CAMP お問い合わせ',
+            subject: `〆88CAMPCAR お問い合わせ〇${form.name.value.trim()}様`,
+            from_name: '88CAMPCAR お問い合わせ',
             name: form.name.value.trim(),
             email: form.email.value.trim(),
             message: `件名：${form.subject.value.trim()}\n\n${form.message.value.trim()}`
