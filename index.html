@@ -324,7 +324,295 @@ NO HOTEL<br/>REQUIRED<span class="text-orange-500">.</span>
 		</div>
 
 	</div>
+<!--
+===========================================
+88CAMPCAR 料金計算ウィジェット
+===========================================
+【貼り付け場所】
+index.html の「03 — Pricing」セクションの
+「STAY LONGER, PAY LESS.」の説明文の直後、
+プランカードの直前に挿入してください。
 
+【Stripe設定】
+- STRIPE_PUBLISHABLE_KEY: 既存のpk_live_キー
+- PRICE_ID: StripeのProductのPrice ID
+  (Stripe → Products → 該当商品 → Price IDをコピー)
+===========================================
+-->
+
+<!-- Stripe.js -->
+<script src="https://js.stripe.com/v3/"></script>
+
+<!-- 料金計算ウィジェット -->
+<div id="price-calculator">
+  <p class="calc-label">PRICE CALCULATOR</p>
+  <p class="calc-title">何泊ご利用ですか？</p>
+
+  <div class="nights-selector">
+    <button class="nights-btn" onclick="changeNights(-1)">−</button>
+    <div class="nights-display">
+      <span id="nights-num">1</span>
+      <span class="nights-unit">泊</span>
+    </div>
+    <button class="nights-btn" onclick="changeNights(1)">＋</button>
+  </div>
+
+  <div class="calc-result">
+    <div class="calc-plan-row">
+      <span id="plan-badge" class="plan-badge">SHORT STAY</span>
+      <span id="discount-badge" class="discount-badge"></span>
+    </div>
+    <div class="calc-breakdown">
+      ¥<span id="unit-price">26,000</span>/泊 × <span id="nights-x">1</span>泊
+    </div>
+    <div class="calc-total">
+      合計 <span id="total-price">¥26,000</span>
+    </div>
+  </div>
+
+  <button id="stripe-pay-btn" onclick="goToStripe()">
+    この内容で予約・お支払いへ →
+  </button>
+  <p class="calc-note">※ Stripeの安全な決済画面へ移動します</p>
+</div>
+
+<style>
+#price-calculator {
+  background: #0d0d0d;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  padding: 36px 28px;
+  max-width: 480px;
+  margin: 0 auto 56px;
+  text-align: center;
+}
+
+.calc-label {
+  color: #f90;
+  font-size: 11px;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.calc-title {
+  color: #fff;
+  font-size: 18px;
+  margin-bottom: 28px;
+  font-weight: 500;
+}
+
+.nights-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.nights-btn {
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid #333;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nights-btn:hover {
+  background: #f90;
+  color: #000;
+  border-color: #f90;
+}
+
+.nights-display {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+#nights-num {
+  color: #fff;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 70px;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.nights-unit {
+  color: #888;
+  font-size: 18px;
+}
+
+.calc-result {
+  background: #151515;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.calc-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.plan-badge {
+  color: #f90;
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  background: rgba(255,153,0,0.1);
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,153,0,0.3);
+}
+
+.discount-badge {
+  color: #4ade80;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.calc-breakdown {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.calc-total {
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+#stripe-pay-btn {
+  width: 100%;
+  background: #f90;
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+#stripe-pay-btn:hover {
+  background: #ffaa22;
+  transform: translateY(-1px);
+}
+
+#stripe-pay-btn:disabled {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.calc-note {
+  color: #555;
+  font-size: 11px;
+  margin-top: 12px;
+}
+</style>
+
+<script>
+// ============================================
+// 設定：StripeのPrice IDをここに入力
+// Stripe → Products → 商品をクリック → 
+// 「Pricing」セクションの「API ID」をコピー
+// 例: price_1ABC...
+// ============================================
+const STRIPE_PUBLISHABLE_KEY = 'pk_live_51TJQD18bpHlYoUmI7j11MAaRrfIN0Eo4moHzWQQZOvFzNXOwIeEqGFVgWxUGlqq8lG2qxStyJhzRvPkRhfHHOOMz00ZHF2rrTc';
+const PRICE_ID = 'price_1TJqs78bpHlYoUmIXg5t02SS';
+// ============================================
+
+let nights = 1;
+
+function changeNights(delta) {
+  nights = Math.max(1, Math.min(30, nights + delta));
+  updateCalc();
+}
+
+function updateCalc() {
+  let unitPrice, planLabel, discountText;
+
+  if (nights <= 3) {
+    unitPrice = 26000;
+    planLabel = 'SHORT STAY';
+    discountText = '';
+  } else if (nights <= 6) {
+    unitPrice = 22000;
+    planLabel = 'MEDIUM PLAN';
+    discountText = '15%OFF';
+  } else {
+    unitPrice = 19000;
+    planLabel = 'WEEKLY PLAN';
+    discountText = '27%OFF';
+  }
+
+  const total = unitPrice * nights;
+
+  document.getElementById('nights-num').textContent = nights;
+  document.getElementById('nights-x').textContent = nights;
+  document.getElementById('unit-price').textContent = unitPrice.toLocaleString();
+  document.getElementById('total-price').textContent = '¥' + total.toLocaleString();
+  document.getElementById('plan-badge').textContent = planLabel;
+  document.getElementById('discount-badge').textContent = discountText;
+}
+
+async function goToStripe() {
+  const btn = document.getElementById('stripe-pay-btn');
+  btn.disabled = true;
+  btn.textContent = '処理中...';
+
+  let unitPrice;
+  if (nights <= 3) unitPrice = 26000;
+  else if (nights <= 6) unitPrice = 22000;
+  else unitPrice = 19000;
+
+  const totalAmount = unitPrice * nights;
+
+  try {
+    const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+    const result = await stripe.redirectToCheckout({
+      lineItems: [{
+        price: PRICE_ID,
+        quantity: nights,
+      }],
+      mode: 'payment',
+      successUrl: window.location.origin + '?booking=success',
+      cancelUrl: window.location.href,
+    });
+
+    if (result.error) {
+      alert('エラーが発生しました: ' + result.error.message);
+    }
+  } catch (e) {
+    alert('エラーが発生しました。しばらくしてから再試行してください。');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'この内容で予約・お支払いへ →';
+}
+
+// 初期化
+updateCalc();
+</script>
 	<!-- pricing cards -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 max-w-5xl">
 
