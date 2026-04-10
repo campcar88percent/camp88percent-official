@@ -195,7 +195,7 @@ async function sendReservationEmail(entry) {
   const html = `
     <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;border:2px solid #111;border-radius:8px;overflow:hidden;">
       <div style="background:#111;color:#fff;padding:20px 24px;">
-        <h1 style="margin:0;font-size:20px;letter-spacing:.05em;">🚐 NAGO.CAMP — 新規予約</h1>
+        <h1 style="margin:0;font-size:20px;letter-spacing:.05em;">🚐 88CAMPCAR — 新規予約</h1>
       </div>
       <div style="padding:24px;">
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
@@ -215,14 +215,14 @@ async function sendReservationEmail(entry) {
         </div>
       </div>
       <div style="background:#f8f8f8;padding:12px 24px;text-align:center;font-size:11px;color:#aaa;">
-        NAGO.CAMP Reservation System
+        88CAMPCAR Reservation System
       </div>
     </div>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"NAGO.CAMP" <${SMTP_USER}>`,
+      from: `"88CAMPCAR" <${SMTP_USER}>`,
       to: ADMIN_EMAIL,
       subject: `【新規予約】${entry.name}様 ${entry.start}〜${entry.end}（${plan.name}）`,
       html
@@ -476,20 +476,20 @@ ${data.message}
 しばらくお待ちください。
 
 ＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
-株式会社88PERCENT　NAGO.CAMPレンタルシステム
+株式会社88PERCENT　88CAMPCARレンタルシステム
 担当：鈴木　　mobile：080-85200-6929
 ${BASE_URL}
 お問合せ 88per88cent@gmail.com
 営業時間 9 時〜18 時（年中無休）
 ＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊
 
-本メールは 88PERCENT　NAGO.CAMPレンタルシステム（${BASE_URL}）のお問い合わせフォームから送信されました`;
+本メールは 88PERCENT　88CAMPCARレンタルシステム（${BASE_URL}）のお問い合わせフォームから送信されました`;
 
   try {
     await transporter.sendMail({
-      from: `"NAGO.CAMP" <${SMTP_USER}>`,
+      from: `"88CAMPCAR" <${SMTP_USER}>`,
       to: data.email,
-      subject: `【NAGO.CAMP】お問い合わせありがとうございます — ${data.subject}`,
+      subject: `【88CAMPCAR】お問い合わせありがとうございます — ${data.subject}`,
       text
     });
     console.log(`[MAIL] お問い合わせ自動返信送信完了 → ${data.email}`);
@@ -507,7 +507,7 @@ async function sendContactNotification(data) {
   const html = `
     <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;border:2px solid #111;border-radius:8px;overflow:hidden;">
       <div style="background:#111;color:#fff;padding:20px 24px;">
-        <h1 style="margin:0;font-size:20px;letter-spacing:.05em;">✉️ NAGO.CAMP — 新規お問い合わせ</h1>
+        <h1 style="margin:0;font-size:20px;letter-spacing:.05em;">✉️ 88CAMPCAR — 新規お問い合わせ</h1>
       </div>
       <div style="padding:24px;">
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
@@ -522,14 +522,14 @@ async function sendContactNotification(data) {
         </div>
       </div>
       <div style="background:#f8f8f8;padding:12px 24px;text-align:center;font-size:11px;color:#aaa;">
-        NAGO.CAMP Contact Form
+        88CAMPCAR Contact Form
       </div>
     </div>
   `;
 
   try {
     await transporter.sendMail({
-      from: `"NAGO.CAMP" <${SMTP_USER}>`,
+      from: `"88CAMPCAR" <${SMTP_USER}>`,
       to: ADMIN_EMAIL,
       replyTo: data.email,
       subject: `【お問い合わせ】${data.name}様 — ${data.subject}`,
