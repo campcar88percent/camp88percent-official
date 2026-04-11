@@ -32,7 +32,7 @@ window.addEventListener('scroll', () => {
             navLinks.classList.remove('text-black/70');
         }
     }
-});
+}, { passive: true });
 
 // --- 2. 予約カレンダー ---
 const calendarEl = document.getElementById('calendar');
