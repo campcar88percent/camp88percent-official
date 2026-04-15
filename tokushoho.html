@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>特定商取引法に基づく表記 | 88CAMPCAR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500&family=Shippori+Mincho:wght@400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --ink: #ffffff;
+      --paper: #111111;
+      --muted: #bbbbbb;
+      --accent: #e86a1a;
+      --rule: #333333;
+      --warm-white: #1a1a1a;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Noto Serif JP', serif;
+      font-weight: 400;
+      line-height: 1.9;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--accent);
+      padding: 2.5rem 2rem 2rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 40px,
+        rgba(255,255,255,0.02) 40px,
+        rgba(255,255,255,0.02) 41px
+      );
+    }
+
+    .brand {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: clamp(1rem, 3vw, 1.25rem);
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      text-decoration: none;
+      display: block;
+      margin-bottom: 0.75rem;
+    }
+
+    header h1 {
+      font-family: 'Shippori Mincho', serif;
+      font-weight: 500;
+      font-size: clamp(1.1rem, 4vw, 1.5rem);
+      color: #fff;
+      letter-spacing: 0.12em;
+      line-height: 1.5;
+    }
+
+    header p.subtitle {
+      font-family: 'DM Mono', monospace;
+      font-weight: 300;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.4);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      margin-top: 0.5rem;
+    }
+
+    /* ── Main Container ── */
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: clamp(2rem, 6vw, 4rem) clamp(1.25rem, 5vw, 2.5rem) 4rem;
+    }
+
+    /* ── Preamble ── */
+    .preamble {
+      background: var(--warm-white);
+      border-left: 3px solid var(--accent);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 3rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    /* ── Section ── */
+    section {
+      margin-bottom: 0;
+    }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: clamp(0.82rem, 2.2vw, 0.92rem);
+    }
+
+    tr {
+      border-bottom: 1px solid var(--rule);
+      animation: fadeUp 0.5s ease both;
+    }
+
+    tr:first-child {
+      border-top: 1px solid var(--rule);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    tr:nth-child(1)  { animation-delay: 0.05s; }
+    tr:nth-child(2)  { animation-delay: 0.10s; }
+    tr:nth-child(3)  { animation-delay: 0.15s; }
+    tr:nth-child(4)  { animation-delay: 0.20s; }
+    tr:nth-child(5)  { animation-delay: 0.25s; }
+    tr:nth-child(6)  { animation-delay: 0.30s; }
+    tr:nth-child(7)  { animation-delay: 0.35s; }
+    tr:nth-child(8)  { animation-delay: 0.40s; }
+    tr:nth-child(9)  { animation-delay: 0.45s; }
+    tr:nth-child(10) { animation-delay: 0.50s; }
+    tr:nth-child(11) { animation-delay: 0.55s; }
+    tr:nth-child(12) { animation-delay: 0.60s; }
+    tr:nth-child(13) { animation-delay: 0.65s; }
+    tr:nth-child(14) { animation-delay: 0.70s; }
+
+    th {
+      width: clamp(120px, 32%, 180px);
+      padding: 1.1rem 1rem 1.1rem 0;
+      font-family: 'Shippori Mincho', serif;
+      font-weight: 500;
+      font-size: 0.82rem;
+      color: var(--accent);
+      vertical-align: top;
+      letter-spacing: 0.05em;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 1.1rem 0 1.1rem 1rem;
+      vertical-align: top;
+      color: var(--ink);
+      line-height: 1.85;
+    }
+
+    td small {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.78rem;
+      color: #bbbbbb;
+      line-height: 1.7;
+    }
+
+    td a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    /* ── Cancel table ── */
+    .cancel-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-top: 0.5rem;
+    }
+
+    .cancel-table th,
+    .cancel-table td {
+      border: 1px solid var(--rule);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .cancel-table th {
+      background: rgba(45,74,62,0.07);
+      font-family: 'Shippori Mincho', serif;
+      font-weight: 500;
+      color: var(--accent);
+      white-space: nowrap;
+      width: auto;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 2.5rem 1rem 3rem;
+      border-top: 1px solid var(--rule);
+      margin-top: 3rem;
+    }
+
+    footer p {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      line-height: 2;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Back link ── */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+      margin-bottom: 2.5rem;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover {
+      color: var(--accent);
+    }
+
+    .back-link::before {
+      content: '←';
+    }
+
+    /* ── Updated date ── */
+    .updated {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 520px) {
+      th {
+        display: block;
+        width: 100%;
+        padding-bottom: 0.2rem;
+        padding-top: 1rem;
+        border-bottom: none;
+      }
+      td {
+        display: block;
+        width: 100%;
+        padding-top: 0.2rem;
+        padding-left: 0;
+        padding-bottom: 1rem;
+      }
+      tr {
+        display: block;
+      }
+      .cancel-table th,
+      .cancel-table td {
+        display: table-cell;
+        width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="brand">88CAMPCAR</a>
+    <h1>特定商取引法に基づく表記</h1>
+    <p class="subtitle">Specified Commercial Transactions Act</p>
+  </header>
+
+  <main>
+    <a href="/" class="back-link">トップページへ戻る</a>
+
+    <p class="updated">最終更新日：2025年4月15日</p>
+
+    <div class="preamble">
+      本ページは、特定商取引に関する法律（特定商取引法）第11条および第12条の規定に基づき、
+      弊社サービスに関する事業者情報を記載するものです。
+    </div>
+
+    <section>
+      <table>
+        <tbody>
+
+          <tr>
+            <th>事業者名</th>
+            <td>株式会社88PERCENT</td>
+          </tr>
+
+          <tr>
+            <th>代表者名</th>
+            <td>鈴木翔真</td>
+          </tr>
+
+          <tr>
+            <th>所在地</th>
+            <td>
+              〒905-0207<br>
+              沖縄県国頭郡本部町字谷茶29番地12
+            </td>
+          </tr>
+
+          <tr>
+            <th>電話番号</th>
+            <td>
+              080-8520-6929
+              <small>※お問い合わせはメールにて優先的に対応いたします。</small>
+            </td>
+          </tr>
+
+          <tr>
+            <th>メールアドレス</th>
+            <td>
+              <a href="mailto:88per88cent@gmail.com">88per88cent@gmail.com</a>
+            </td>
+          </tr>
+
+          <tr>
+            <th>サービス内容</th>
+            <td>
+              キャンプカー（改装済みトヨタ ハイエース）のレンタル<br>
+              沖縄県やんばる地域を拠点とした車両貸渡サービス
+            </td>
+          </tr>
+
+          <tr>
+            <th>利用料金</th>
+            <td>
+              1泊（1日）プラン：¥26,000（税込）<br>
+              2泊（2日）プラン：¥22,000／泊（税込）<br>
+              3泊以上プラン：¥19,000／泊（税込）<br>
+              <small>※別途、任意の車両保険料が発生する場合があります。</small>
+            </td>
+          </tr>
+
+          <tr>
+            <th>支払方法</th>
+            <td>
+              クレジットカード決済（Visa / Mastercard / American Express / JCB 等）<br>
+              <small>※Stripeによる安全な決済処理を採用しています。</small>
+            </td>
+          </tr>
+
+          <tr>
+            <th>支払時期</th>
+            <td>予約お申し込み時に即時決済いたします。</td>
+          </tr>
+
+          <tr>
+            <th>サービス提供時期</th>
+            <td>
+              予約確定後、ご指定の貸渡日よりサービスを提供いたします。<br>
+              <small>※貸渡・返却の時間・場所は予約確認メールにてご案内します。</small>
+            </td>
+          </tr>
+
+          <tr>
+            <th>キャンセル・<br>返金ポリシー</th>
+            <td>
+              お客様のご都合によるキャンセルは、以下の規定に従い取り扱います。
+
+              <table class="cancel-table" style="margin-top:0.75rem;">
+                <thead>
+                  <tr>
+                    <th>キャンセル時期</th>
+                    <th>キャンセル料</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>貸渡日の8日前以前</td>
+                    <td>無料（全額返金）</td>
+                  </tr>
+                  <tr>
+                    <td>貸渡日の7日前〜4日前</td>
+                    <td>料金の30%</td>
+                  </tr>
+                  <tr>
+                    <td>貸渡日の3日前〜前日</td>
+                    <td>料金の50%</td>
+                  </tr>
+                  <tr>
+                    <td>貸渡当日・無連絡不着</td>
+                    <td>料金の100%</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <small style="margin-top:0.6rem;">
+                ※返金はStripeを通じてクレジットカードへ返金します。返金反映には数営業日かかる場合があります。<br>
+                ※悪天候・自然災害等、弊社都合によるキャンセルの場合は全額返金いたします。
+              </small>
+            </td>
+          </tr>
+
+          <tr>
+            <th>動作環境</th>
+            <td>
+              本サービスのご予約・決済は、主要ウェブブラウザ（Chrome / Safari / Firefox / Edge 最新版）にてご利用いただけます。
+            </td>
+          </tr>
+
+          <tr>
+            <th>個人情報の取扱い</th>
+            <td>
+              ご提供いただいた個人情報は、予約管理・お問い合わせ対応・法令上の義務履行のためにのみ使用し、
+              第三者への提供は行いません（法令に基づく場合を除く）。
+            </td>
+          </tr>
+
+          <tr>
+            <th>免許・登録</th>
+            <td>
+              自家用自動車有償貸渡業（レンタカー事業）<br>
+              交付番号：第2111号<br>
+              <small>※沖縄総合事務局 運輸部による許可取得済み</small>
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>
+      &copy; 2025 株式会社88PERCENT — 88CAMPCAR<br>
+      <a href="/">campcar88percent.github.io</a>
+    </p>
+  </footer>
+
+</body>
+</html>
