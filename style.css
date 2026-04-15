@@ -49,9 +49,13 @@ html, body { overflow-x: hidden !important; }
 }
 
 /* ===== スクロールバー ===== */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 6px; height: 4px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
 ::-webkit-scrollbar-thumb { background: #000; }
+
+/* フロアプラン横スクロール用 */
+.bg-black ::-webkit-scrollbar-track { background: #0a0a0a; }
+.bg-black ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
 
 /* ===== Vehicle（展開図）画像 ===== */
 .vehicle-wrap { padding: 16px; }
