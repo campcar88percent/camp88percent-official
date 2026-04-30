@@ -19,6 +19,7 @@ const RATE_MAX_RESERVE = 10;             // 予約API上限
 const RATE_MAX_LOGIN = 5;                // ログイン試行上限
 const RATE_CLEANUP_MS = 5 * 60 * 1000;  // クリーンアップ間隔
 const MAX_RATE_ENTRIES = 10_000;         // メモリリーク防止
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 管理セッション有効期限（12時間）
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
 const ALLOWED_FILE_TYPES = /jpeg|jpg|png|webp|heic|pdf/i;
 
@@ -68,6 +69,7 @@ app.use(express.json({ limit: '1mb' }));
 //  レート制限
 // ======================================================
 const rateLimitMap = new Map();
+const adminSessionMap = new Map();
 
 /**
  * IPベースのレート制限ミドルウェアを生成
@@ -100,6 +102,9 @@ const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, rec] of rateLimitMap) {
     if (now - rec.start > RATE_CLEANUP_MS * 2) rateLimitMap.delete(key);
+  }
+  for (const [token, session] of adminSessionMap) {
+    if (session.expiresAt <= now) adminSessionMap.delete(token);
   }
 }, RATE_CLEANUP_MS);
 cleanupTimer.unref();
@@ -167,6 +172,33 @@ function parseCookies(cookieHeader) {
     acc[key] = decodeURIComponent(val);
     return acc;
   }, {});
+}
+
+/**
+ * 管理セッションを新規作成
+ * @returns {{sessionToken: string, csrfToken: string, expiresAt: number}}
+ */
+function createAdminSession() {
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  const csrfToken = crypto.randomBytes(24).toString('hex');
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  adminSessionMap.set(sessionToken, { csrfToken, expiresAt });
+  return { sessionToken, csrfToken, expiresAt };
+}
+
+/**
+ * 管理セッションを取得（期限切れは破棄）
+ * @param {string} sessionToken
+ * @returns {{csrfToken: string, expiresAt: number} | null}
+ */
+function getAdminSession(sessionToken) {
+  const s = adminSessionMap.get(sessionToken);
+  if (!s) return null;
+  if (s.expiresAt <= Date.now()) {
+    adminSessionMap.delete(sessionToken);
+    return null;
+  }
+  return s;
 }
 
 // ======================================================
@@ -256,8 +288,21 @@ async function sendReservationEmail(entry) {
 //  データストア（JSONファイル）
 // ======================================================
 const reservationsFile = path.join(__dirname, '..', 'reservations.json');
+const adminAuditFile = path.join(__dirname, '..', 'admin-audit.log');
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+/** 管理操作ログをJSON Lines形式で追記 */
+function writeAdminAudit(req, action, payload = {}) {
+  const row = {
+    ts: new Date().toISOString(),
+    action,
+    ip: req.ip,
+    ua: req.headers['user-agent'] || '',
+    ...payload
+  };
+  fs.promises.appendFile(adminAuditFile, JSON.stringify(row) + '\n', 'utf8').catch(() => {});
+}
 
 /** 予約データを非同期で読み込み */
 async function readReservations() {
@@ -337,8 +382,32 @@ function adminAuth(req, res, next) {
   const cookies = parseCookies(req.headers.cookie || '');
   const tokenFromCookie = cookies[ADMIN_COOKIE_NAME] || '';
   const token = tokenFromHeader || tokenFromQuery || tokenFromCookie;
-  if (!safeCompare(token, ADMIN_PASS)) {
-    return res.status(401).json({ error: '管理者認証が必要です' });
+
+  // 互換性: 旧Bearer認証（ADMIN_PASS直指定）
+  if (safeCompare(token, ADMIN_PASS)) {
+    req.adminLegacy = true;
+    return next();
+  }
+
+  const session = getAdminSession(token);
+  if (!session) return res.status(401).json({ error: '管理者認証が必要です' });
+
+  req.adminSession = session;
+  req.adminSessionToken = token;
+  next();
+}
+
+/**
+ * 管理APIのCSRF検証（状態変更系で必須）
+ */
+function requireAdminCsrf(req, res, next) {
+  // 旧Bearer互換モードでは暫定的に許可（段階移行のため）
+  if (req.adminLegacy) return next();
+
+  const csrf = req.headers['x-csrf-token'];
+  const expected = req.adminSession?.csrfToken || '';
+  if (typeof csrf !== 'string' || !expected || !safeCompare(csrf, expected)) {
+    return res.status(403).json({ error: 'CSRFトークンが不正です。再ログインしてください。' });
   }
   next();
 }
@@ -362,7 +431,7 @@ app.use(express.static(path.join(__dirname, '..'), {
 // アップロードファイルは管理者認証必須
 app.use('/uploads', adminAuth, express.static(uploadsDir));
 
-// 管理者向け: 免許証画像の安全な配信（imgタグでも閲覧できるよう token クエリを許可）
+// 管理者向け: 免許証画像の安全な配信
 app.get('/api/admin/license/:filename', adminAuth, async (req, res, next) => {
   try {
     const safeName = path.basename(req.params.filename || '');
@@ -626,28 +695,42 @@ app.post('/api/admin/login',
   (req, res) => {
     const { password } = req.body || {};
     if (!password || !safeCompare(password, ADMIN_PASS)) {
+      writeAdminAudit(req, 'admin_login_failed');
       return res.status(401).json({ error: 'パスワードが正しくありません' });
     }
-    res.cookie(ADMIN_COOKIE_NAME, ADMIN_PASS, {
+
+    const session = createAdminSession();
+    res.cookie(ADMIN_COOKIE_NAME, session.sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 12 * 60 * 60 * 1000,
+      maxAge: SESSION_TTL_MS,
       path: '/'
     });
+    writeAdminAudit(req, 'admin_login_success');
     res.json({ ok: true });
   }
 );
 
 // 管理者ログアウト
-app.post('/api/admin/logout', (_req, res) => {
+app.post('/api/admin/logout', adminAuth, (req, res) => {
+  if (req.adminSessionToken) adminSessionMap.delete(req.adminSessionToken);
   res.clearCookie(ADMIN_COOKIE_NAME, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     path: '/'
   });
+  writeAdminAudit(req, 'admin_logout');
   res.json({ ok: true });
+});
+
+// 管理画面用CSRFトークン取得
+app.get('/api/admin/csrf', adminAuth, (req, res) => {
+  if (!req.adminLegacy && req.adminSession?.csrfToken) {
+    return res.json({ ok: true, csrfToken: req.adminSession.csrfToken });
+  }
+  return res.status(400).json({ error: 'CSRFトークンを発行できません。再ログインしてください。' });
 });
 
 // 全予約取得
@@ -663,7 +746,7 @@ app.get('/api/admin/reservations', adminAuth, async (req, res, next) => {
 });
 
 // 予約ステータス更新
-app.patch('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
+app.patch('/api/admin/reservations/:id', adminAuth, requireAdminCsrf, async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
@@ -675,6 +758,10 @@ app.patch('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
     list[idx].status = status;
     list[idx].updatedAt = new Date().toISOString();
     await writeReservations(list);
+    writeAdminAudit(req, 'reservation_status_changed', {
+      reservationId: req.params.id,
+      status
+    });
     res.json({ ok: true, reservation: list[idx] });
   } catch (err) {
     next(err);
@@ -682,7 +769,7 @@ app.patch('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
 });
 
 // 予約削除
-app.delete('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
+app.delete('/api/admin/reservations/:id', adminAuth, requireAdminCsrf, async (req, res, next) => {
   try {
     let list = await readReservations();
     const target = list.find(r => r.id === req.params.id);
@@ -696,6 +783,11 @@ app.delete('/api/admin/reservations/:id', adminAuth, async (req, res, next) => {
     }
     list = list.filter(r => r.id !== req.params.id);
     await writeReservations(list);
+    writeAdminAudit(req, 'reservation_deleted', {
+      reservationId: req.params.id,
+      name: target.name,
+      email: target.email
+    });
     res.json({ ok: true });
   } catch (err) {
     next(err);

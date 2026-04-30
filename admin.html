@@ -242,6 +242,7 @@
 let reservations = [];
 let currentFilter = 'all';
 let searchQuery = '';
+let csrfToken = '';
 
 // ── DOM ──
 const $ = id => document.getElementById(id);
@@ -260,7 +261,12 @@ load();
 loginBtn.addEventListener('click', tryLogin);
 loginPass.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 $('btn-logout').addEventListener('click', async () => {
-  try { await fetch('/api/admin/logout', { method: 'POST' }); } catch {}
+  try {
+    await fetch('/api/admin/logout', {
+      method: 'POST',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {}
+    });
+  } catch {}
   location.reload();
 });
 
@@ -288,9 +294,22 @@ async function load() {
       loginOverlay.classList.remove('hidden');
       return;
     }
-    reservations = await r.json(); render();
+    reservations = await r.json();
+    await fetchCsrfToken();
+    render();
     loginOverlay.classList.add('hidden');
   } catch (e) { console.error(e); }
+}
+
+async function fetchCsrfToken() {
+  try {
+    const r = await fetch('/api/admin/csrf', { cache: 'no-store' });
+    if (!r.ok) throw new Error('csrf');
+    const data = await r.json();
+    csrfToken = data.csrfToken || '';
+  } catch {
+    csrfToken = '';
+  }
 }
 
 // ── Helpers ──
@@ -388,25 +407,37 @@ async function act(id, status) {
   try {
     const r = await fetch(`/api/admin/reservations/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      },
       body: JSON.stringify({ status })
     });
+    if (r.status === 403) {
+      await fetchCsrfToken();
+      throw new Error('再ログイン後に再試行してください');
+    }
     if (!r.ok) throw 0;
     const label = { confirmed: '確定', cancelled: 'キャンセル', pending: '受付中' }[status];
     toast(`ステータスを「${label}」に変更`);
     load();
-  } catch { toast('操作に失敗しました', true); }
+  } catch (err) { toast(err.message || '操作に失敗しました', true); }
 }
 
 async function del(id, name) {
   if (!confirm(`${name}様の予約を削除しますか？\n（免許証画像も削除されます）`)) return;
   try {
     const r = await fetch(`/api/admin/reservations/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { 'X-CSRF-Token': csrfToken }
     });
+    if (r.status === 403) {
+      await fetchCsrfToken();
+      throw new Error('再ログイン後に再試行してください');
+    }
     if (!r.ok) throw 0;
     toast('予約を削除しました'); load();
-  } catch { toast('削除に失敗しました', true); }
+  } catch (err) { toast(err.message || '削除に失敗しました', true); }
 }
 
 // ── Lightbox ──
