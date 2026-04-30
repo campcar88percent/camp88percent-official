@@ -30,16 +30,12 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
-const ADMIN_PASS = process.env.ADMIN_PASS;
 const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
 const ADMIN_COOKIE_NAME = 'admin_session';
 
-if (!ADMIN_PASS && !ADMIN_PASS_HASH) {
-  console.error('⛔ ADMIN_PASS または ADMIN_PASS_HASH が必要です。サーバーを起動できません。');
+if (!ADMIN_PASS_HASH) {
+  console.error('⛔ ADMIN_PASS_HASH が未設定です。ハッシュ必須モードのためサーバーを起動できません。');
   process.exit(1);
-}
-if (ADMIN_PASS && !ADMIN_PASS_HASH) {
-  console.warn('⚠️ ADMIN_PASS_HASH 未設定です。平文パスワード認証で起動します（推奨: ハッシュ化）。');
 }
 
 // ======================================================
@@ -217,9 +213,7 @@ function verifyScryptHash(inputPassword, stored) {
  */
 function verifyAdminPassword(inputPassword) {
   if (typeof inputPassword !== 'string' || !inputPassword) return false;
-  if (ADMIN_PASS_HASH && verifyScryptHash(inputPassword, ADMIN_PASS_HASH)) return true;
-  if (ADMIN_PASS && safeCompare(inputPassword, ADMIN_PASS)) return true;
-  return false;
+  return verifyScryptHash(inputPassword, ADMIN_PASS_HASH);
 }
 
 /**
@@ -456,12 +450,6 @@ function adminAuth(req, res, next) {
   const tokenFromCookie = cookies[ADMIN_COOKIE_NAME] || '';
   const token = tokenFromHeader || tokenFromQuery || tokenFromCookie;
 
-  // 互換性: 旧Bearer認証（ADMIN_PASS直指定）
-  if (ADMIN_PASS && safeCompare(token, ADMIN_PASS)) {
-    req.adminLegacy = true;
-    return next();
-  }
-
   const session = getAdminSession(token);
   if (!session) return res.status(401).json({ error: '管理者認証が必要です' });
 
@@ -474,9 +462,6 @@ function adminAuth(req, res, next) {
  * 管理APIのCSRF検証（状態変更系で必須）
  */
 function requireAdminCsrf(req, res, next) {
-  // 旧Bearer互換モードでは暫定的に許可（段階移行のため）
-  if (req.adminLegacy) return next();
-
   const csrf = req.headers['x-csrf-token'];
   const expected = req.adminSession?.csrfToken || '';
   if (typeof csrf !== 'string' || !expected || !safeCompare(csrf, expected)) {
@@ -800,7 +785,7 @@ app.post('/api/admin/logout', adminAuth, (req, res) => {
 
 // 管理画面用CSRFトークン取得
 app.get('/api/admin/csrf', adminAuth, (req, res) => {
-  if (!req.adminLegacy && req.adminSession?.csrfToken) {
+  if (req.adminSession?.csrfToken) {
     return res.json({ ok: true, csrfToken: req.adminSession.csrfToken });
   }
   return res.status(400).json({ error: 'CSRFトークンを発行できません。再ログインしてください。' });

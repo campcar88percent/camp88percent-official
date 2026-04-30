@@ -1,24 +1,39 @@
-# NAGO CAMP — ローカル開発サーバー
+# 88CAMPCAR - 予約・管理システム
 
-このリポジトリは静的なフロントエンド（`index.html`, `style.css`, `script.js`）と、AI 呼び出しを安全に行うための簡易プロキシ（`/api/genai`）を含みます。
+静的LP (`index.html`) と Express サーバー (`server/index.js`) を組み合わせた、
+キャンピングカーレンタル向けの予約システムです。
 
-セットアップ手順（macOS / Node.js）:
+## 主な機能
+
+- 予約フォーム（免許証 表/裏アップロード必須）
+- 二重予約防止（1台運用向け）
+- 予約データ保存 (`reservations.json`)
+- 管理画面 (`admin.html`) で予約一覧・ステータス更新・削除
+- 管理画面認証（HTTP Only Cookie + CSRF対策）
+- 管理操作監査ログ (`admin-audit.log`)
+
+## セットアップ
 
 1. 依存関係をインストール
 
 ```bash
-cd "$(dirname "$0")"
 npm install
 ```
 
-2. 環境変数を設定
+1. 管理者パスワードハッシュを生成
+
+```bash
+npm run gen:admin-hash "your_admin_password"
+```
+
+1. 環境変数を設定
 
 ```bash
 cp .env.example .env
-# .env に OPENAI_API_KEY を設定してください
+# .env の ADMIN_PASS_HASH に生成結果を貼り付け
 ```
 
-3. サーバーを起動
+1. サーバー起動
 
 ```bash
 npm run dev
@@ -26,13 +41,36 @@ npm run dev
 npm start
 ```
 
-4. ブラウザで開く
+1. 確認URL
 
-http://localhost:3000
+- LP: <http://localhost:3000>
+- 管理画面: <http://localhost:3000/admin.html>
 
-使い方:
-- フロントエンドの `script.js` が `/api/genai` に POST (body: { prompt }) します。
-- サーバーは `OPENAI_API_KEY` を使って OpenAI の Chat Completions API を呼び出し、生成されたテキストを返します。
+## 必須環境変数
 
-注意:
-- 本サーバーは開発用途向けの簡易プロキシです。本番環境では認証、レート制限、ログ保存、CSP などを強化してください。
+- `ADMIN_PASS_HASH`: 管理ログイン用ハッシュ（必須）
+
+## 任意環境変数
+
+- `ADMIN_EMAIL`: 管理者通知メール送信先
+- `SMTP_USER`: Gmailアドレス
+- `SMTP_PASS`: Gmailアプリパスワード
+- `BASE_URL`: メール本文のリンク生成用
+- `PORT`: サーバーポート（既定: 3000）
+
+## 主要API
+
+- `POST /api/reserve` 予約登録（multipart/form-data）
+- `GET /api/reservations/dates` 予約済み日付一覧
+- `POST /api/contact` 問い合わせ送信
+- `POST /api/admin/login` 管理ログイン
+- `POST /api/admin/logout` 管理ログアウト
+- `GET /api/admin/csrf` 管理画面CSRFトークン
+- `GET /api/admin/reservations` 予約一覧取得
+- `PATCH /api/admin/reservations/:id` ステータス更新
+- `DELETE /api/admin/reservations/:id` 予約削除
+
+## 監査ログ
+
+- ファイル: `admin-audit.log`
+- 自動ローテーション: 5MBごと、最大5世代保持
