@@ -239,7 +239,6 @@
 
 <script>
 // ── State ──
-let token = sessionStorage.getItem('admin_token') || '';
 let reservations = [];
 let currentFilter = 'all';
 let searchQuery = '';
@@ -256,12 +255,13 @@ const lightbox = $('lightbox');
 const lightboxImg = $('lightbox-img');
 
 // ── Auth ──
-if (token) { loginOverlay.classList.add('hidden'); load(); }
+load();
 
 loginBtn.addEventListener('click', tryLogin);
 loginPass.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
-$('btn-logout').addEventListener('click', () => {
-  token = ''; sessionStorage.removeItem('admin_token'); location.reload();
+$('btn-logout').addEventListener('click', async () => {
+  try { await fetch('/api/admin/logout', { method: 'POST' }); } catch {}
+  location.reload();
 });
 
 async function tryLogin() {
@@ -269,20 +269,27 @@ async function tryLogin() {
   if (!p) return;
   loginErr.textContent = '';
   try {
-    const r = await fetch('/api/admin/reservations', { headers: { Authorization: `Bearer ${p}` } });
+    const r = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: p })
+    });
     if (!r.ok) throw 0;
-    token = p; sessionStorage.setItem('admin_token', token);
     loginOverlay.classList.add('hidden');
-    reservations = await r.json(); render();
+    await load();
   } catch { loginErr.textContent = 'パスワードが正しくありません'; loginPass.select(); }
 }
 
 // ── Load ──
 async function load() {
   try {
-    const r = await fetch('/api/admin/reservations', { headers: { Authorization: `Bearer ${token}` } });
-    if (r.status === 401) { token = ''; sessionStorage.removeItem('admin_token'); location.reload(); return; }
+    const r = await fetch('/api/admin/reservations');
+    if (r.status === 401) {
+      loginOverlay.classList.remove('hidden');
+      return;
+    }
     reservations = await r.json(); render();
+    loginOverlay.classList.add('hidden');
   } catch (e) { console.error(e); }
 }
 
@@ -304,7 +311,7 @@ function fmtD(d) { return d ? d.replace(/-/g, '/') : '—'; }
 function fmtDT(iso) { return iso ? new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function licenseUrl(filename) {
-  return `/api/admin/license/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
+  return `/api/admin/license/${encodeURIComponent(filename)}`;
 }
 
 // ── Render ──
@@ -381,7 +388,7 @@ async function act(id, status) {
   try {
     const r = await fetch(`/api/admin/reservations/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
     if (!r.ok) throw 0;
@@ -395,7 +402,7 @@ async function del(id, name) {
   if (!confirm(`${name}様の予約を削除しますか？\n（免許証画像も削除されます）`)) return;
   try {
     const r = await fetch(`/api/admin/reservations/${id}`, {
-      method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+      method: 'DELETE'
     });
     if (!r.ok) throw 0;
     toast('予約を削除しました'); load();
@@ -427,7 +434,7 @@ document.querySelectorAll('.filter-btn').forEach(b => {
 searchInput.addEventListener('input', e => { searchQuery = e.target.value; render(); });
 
 // ── Auto-refresh 30s ──
-setInterval(() => { if (token) load(); }, 30000);
+setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
 </script>
 </body>
 </html>

@@ -28,6 +28,7 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const ADMIN_PASS = process.env.ADMIN_PASS;
+const ADMIN_COOKIE_NAME = 'admin_session';
 
 if (!ADMIN_PASS) {
   console.error('⛔ ADMIN_PASS が環境変数に設定されていません。サーバーを起動できません。');
@@ -148,6 +149,24 @@ function safeCompare(a, b) {
  */
 function isValidPhone(phone) {
   return /^[\d\-+() ]{8,20}$/.test(phone);
+}
+
+/**
+ * Cookieヘッダをパース
+ * @param {string} cookieHeader
+ * @returns {Record<string,string>}
+ */
+function parseCookies(cookieHeader) {
+  if (!cookieHeader || typeof cookieHeader !== 'string') return {};
+  return cookieHeader.split(';').reduce((acc, part) => {
+    const idx = part.indexOf('=');
+    if (idx === -1) return acc;
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    if (!key) return acc;
+    acc[key] = decodeURIComponent(val);
+    return acc;
+  }, {});
 }
 
 // ======================================================
@@ -315,7 +334,9 @@ function adminAuth(req, res, next) {
   const auth = req.headers.authorization || '';
   const tokenFromHeader = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const tokenFromQuery = typeof req.query?.token === 'string' ? req.query.token : '';
-  const token = tokenFromHeader || tokenFromQuery;
+  const cookies = parseCookies(req.headers.cookie || '');
+  const tokenFromCookie = cookies[ADMIN_COOKIE_NAME] || '';
+  const token = tokenFromHeader || tokenFromQuery || tokenFromCookie;
   if (!safeCompare(token, ADMIN_PASS)) {
     return res.status(401).json({ error: '管理者認証が必要です' });
   }
@@ -607,9 +628,27 @@ app.post('/api/admin/login',
     if (!password || !safeCompare(password, ADMIN_PASS)) {
       return res.status(401).json({ error: 'パスワードが正しくありません' });
     }
+    res.cookie(ADMIN_COOKIE_NAME, ADMIN_PASS, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 12 * 60 * 60 * 1000,
+      path: '/'
+    });
     res.json({ ok: true });
   }
 );
+
+// 管理者ログアウト
+app.post('/api/admin/logout', (_req, res) => {
+  res.clearCookie(ADMIN_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/'
+  });
+  res.json({ ok: true });
+});
 
 // 全予約取得
 app.get('/api/admin/reservations', adminAuth, async (req, res, next) => {
