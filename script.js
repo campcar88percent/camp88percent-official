@@ -1,11 +1,7 @@
 // ======================================================
 // 88CAMPCAR — script.js
-// 予約フォーム & お問い合わせ: Web3Forms
-// 予約済み日程: booked-dates.json (GitHub静的ファイル)
+// 予約フォーム・お問い合わせ・予約済み日程: サーバーAPI
 // ======================================================
-
-const WEB3FORMS_KEY = '020615cb-3610-4daf-a37c-d46f9f5dbf78';
-// ↑ Web3Formsの画面に表示されたAPIキー全体をコピーして貼り付けてください
 
 // --- 1. ナビゲーションのスクロール制御 ---
 const navbar = document.getElementById('navbar');
@@ -51,14 +47,15 @@ let calSelEnd = null;
 const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 const WEEK_HEADS = ['月','火','水','木','金','土','日'];
 
-// 予約済み日付を booked-dates.json から取得
+// 予約済み日付をサーバーAPIから取得
 async function fetchBookedDates() {
     try {
-        const res = await fetch('./booked-dates.json?t=' + Date.now());
+        const res = await fetch('/api/reservations/dates?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('予約日取得に失敗');
         const data = await res.json();
         calBookedSet = new Set(data.booked || []);
     } catch (e) {
-        console.warn('booked-dates.json が見つかりません。空として扱います。', e);
+        console.warn('予約済み日程の取得に失敗しました。', e);
         calBookedSet = new Set();
     }
 }
@@ -74,7 +71,7 @@ function datesInRange(startStr, endStr) {
     const dates = [];
     const d = parseDate(startStr);
     const end = parseDate(endStr);
-    while (d <= end) {
+    while (d < end) {
         dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
         d.setDate(d.getDate() + 1);
     }
@@ -279,7 +276,7 @@ async function initCalendar() { await fetchBookedDates(); renderCalendar(); }
 window.refreshCalendar = async function() { await fetchBookedDates(); renderCalendar(); };
 if (calendarEl) initCalendar();
 
-// --- 3. 予約フォーム モーダル制御 & Web3Forms送信 ---
+// --- 3. 予約フォーム モーダル制御 & API送信 ---
 const openReserveBtn = document.getElementById('open-reserve');
 const reserveModal = document.getElementById('reserve-modal');
 const closeReserveBtn = document.getElementById('close-reserve');
@@ -404,7 +401,7 @@ if (yakkanCheckbox && reserveSubmitBtn) {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.style.display === 'flex') closeYakkan(); });
 })();
 
-// 予約フォーム送信 → Web3Forms
+// 予約フォーム送信 → サーバーAPI（免許証アップロード必須）
 if (reserveForm) {
     reserveForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -417,86 +414,43 @@ if (reserveForm) {
         const start = reserveForm.querySelector('[name="start"]').value;
         const end = reserveForm.querySelector('[name="end"]').value;
 
-        if (new Date(start) > new Date(end)) {
-            reserveMessage.innerText = '終了日は開始日以降にしてください';
+        if (new Date(start) >= new Date(end)) {
+            reserveMessage.innerText = '終了日は開始日の翌日以降にしてください';
             reserveMessage.classList.add('text-red-500');
             submitBtn.disabled = false;
             submitBtn.innerText = '予約を送信';
             return;
         }
 
-        // 免許証画像をBase64変換してメール本文に含める
-        async function fileToBase64(file) {
-            return new Promise((resolve) => {
-                if (!file) { resolve('未添付'); return; }
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.readAsDataURL(file);
-            });
-        }
-
         const frontFile = reserveForm.querySelector('[name="license_front"]').files[0];
         const backFile = reserveForm.querySelector('[name="license_back"]').files[0];
 
-        const name = reserveForm.querySelector('[name="name"]').value;
-        const email = reserveForm.querySelector('[name="email"]').value;
-        const phone = reserveForm.querySelector('[name="phone"]').value;
-        const info = determinePlan(start, end);
-        const total = info.pricePerDay * info.nights;
+        if (!frontFile || !backFile) {
+            reserveMessage.innerText = '免許証の表面・裏面をアップロードしてください。';
+            reserveMessage.classList.add('text-red-500');
+            submitBtn.disabled = false;
+            submitBtn.innerText = '予約を送信';
+            return;
+        }
 
-        // Web3Formsに送信（免許証はファイル名のみ記載・別途Google Driveで受け取る）
-        const payload = {
-            access_key: WEB3FORMS_KEY,
-            subject: `〆88CAMPCAR 予約申込〇${name}様 ${formatDateJP(start)}～${formatDateJP(end)}`,
-            from_name: '88CAMPCAR 予約システム',
-            name: name,
-            email: email,
-            message: `
-━━━━━━━━━━━━━━━━━━━━
-88CAMPCAR 予約申込
-━━━━━━━━━━━━━━━━━━━━
-【お客様情報】
-お名前：${name}
-メール：${email}
-電話番号：${phone}
-
-【ご利用内容】
-プラン：${info.name}
-チェックイン：${start}
-チェックアウト：${end}
-泊数：${info.nights}泊
-料金：¥${total.toLocaleString()}（税込）
-
-【免許証】
-表面ファイル名：${frontFile ? frontFile.name : '未添付'}
-裏面ファイル名：${backFile ? backFile.name : '未添付'}
-
-【貸渡契約書】同意済み
-━━━━━━━━━━━━━━━━━━━━
-※ 免許証は別途メールでお送りいただくか、
-　 受け渡し当日にご提示ください。
-━━━━━━━━━━━━━━━━━━━━
-            `.trim(),
-            // お客様への自動返信
-            replyto: email,
-        };
+        const formData = new FormData(reserveForm);
 
         try {
-            const res = await fetch('https://api.web3forms.com/submit', {
+            const res = await fetch('/api/reserve', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(payload)
+                body: formData
             });
             const data = await res.json();
-            if (data.success) {
+            if (res.ok && data.ok) {
                 reserveMessage.innerText = '✓ 予約申込を受け付けました。確認メールをご確認ください。';
                 reserveMessage.classList.add('text-green-600');
+                await window.refreshCalendar();
                 setTimeout(closeReserve, 3000);
             } else {
-                throw new Error(data.message || '送信に失敗しました');
+                throw new Error(data.error || '送信に失敗しました');
             }
         } catch (err) {
-            reserveMessage.innerText = '送信に失敗しました。もう一度お試しください。';
+            reserveMessage.innerText = err.message || '送信に失敗しました。もう一度お試しください。';
             reserveMessage.classList.add('text-red-500');
         } finally {
             submitBtn.disabled = false;
@@ -658,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
     filterBtns.forEach(b => { if (!b) return; b.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); b.click(); } }); });
 });
 
-// --- 5. お問い合わせフォーム → Web3Forms ---
+// --- 5. お問い合わせフォーム → サーバーAPI ---
 (function initContactForm() {
     const form = document.getElementById('contact-form');
     if (!form) return;
@@ -674,30 +628,28 @@ document.addEventListener('DOMContentLoaded', () => {
         resultEl.className = 'text-sm font-bold text-center';
 
         const payload = {
-            access_key: WEB3FORMS_KEY,
-            subject: `〆88CAMPCAR お問い合わせ〇${form.name.value.trim()}様`,
-            from_name: '88CAMPCAR お問い合わせ',
             name: form.name.value.trim(),
             email: form.email.value.trim(),
-            message: `件名：${form.subject.value.trim()}\n\n${form.message.value.trim()}`
+            subject: form.subject.value.trim(),
+            message: form.message.value.trim()
         };
 
         try {
-            const res = await fetch('https://api.web3forms.com/submit', {
+            const res = await fetch('/api/contact', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
-            if (data.success) {
-                resultEl.textContent = 'お問い合わせを送信しました。確認メールをご確認ください。';
+            if (res.ok && data.ok) {
+                resultEl.textContent = data.message || 'お問い合わせを送信しました。';
                 resultEl.classList.add('text-green-600');
                 form.reset();
             } else {
-                throw new Error(data.message);
+                throw new Error(data.error || '送信に失敗しました');
             }
-        } catch {
-            resultEl.textContent = '通信エラーが発生しました。しばらくしてからお試しください。';
+        } catch (err) {
+            resultEl.textContent = err.message || '通信エラーが発生しました。しばらくしてからお試しください。';
             resultEl.classList.add('text-red-500');
         } finally {
             submitBtn.disabled = false;

@@ -303,6 +303,9 @@ function sBadge(s) {
 function fmtD(d) { return d ? d.replace(/-/g, '/') : '—'; }
 function fmtDT(iso) { return iso ? new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function licenseUrl(filename) {
+  return `/api/admin/license/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
+}
 
 // ── Render ──
 function render() {
@@ -353,8 +356,8 @@ function render() {
           ${(r.licenseFront || r.licenseBack) ? `
             <div style="font-size:11px;font-weight:700;color:#999;margin-bottom:4px;">免許証</div>
             <div class="license-thumbs">
-              ${r.licenseFront ? `<img class="license-thumb" src="/uploads/${r.licenseFront}" alt="表" onclick="openLB('/uploads/${r.licenseFront}')" />` : ''}
-              ${r.licenseBack ? `<img class="license-thumb" src="/uploads/${r.licenseBack}" alt="裏" onclick="openLB('/uploads/${r.licenseBack}')" />` : ''}
+              ${r.licenseFront ? `<img class="license-thumb" src="${licenseUrl(r.licenseFront)}" alt="表" onclick="openLB('${licenseUrl(r.licenseFront)}')" />` : ''}
+              ${r.licenseBack ? `<img class="license-thumb" src="${licenseUrl(r.licenseBack)}" alt="裏" onclick="openLB('${licenseUrl(r.licenseBack)}')" />` : ''}
             </div>` : ''}
           <div class="action-bar">
             ${r.status !== 'confirmed' ? `<button class="action-btn btn-confirm" onclick="act('${r.id}','confirmed')">✓ 確定</button>` : ''}

@@ -44,11 +44,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://unpkg.com", "https://js.stripe.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https://*.tile.openstreetmap.org", "https://unpkg.com", "https://raw.githubusercontent.com"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://js.stripe.com", "https://m.stripe.network", "https://q.stripe.com"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"]
@@ -313,7 +313,9 @@ const upload = multer({
  */
 function adminAuth(req, res, next) {
   const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const tokenFromHeader = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const tokenFromQuery = typeof req.query?.token === 'string' ? req.query.token : '';
+  const token = tokenFromHeader || tokenFromQuery;
   if (!safeCompare(token, ADMIN_PASS)) {
     return res.status(401).json({ error: '管理者認証が必要です' });
   }
@@ -339,6 +341,19 @@ app.use(express.static(path.join(__dirname, '..'), {
 // アップロードファイルは管理者認証必須
 app.use('/uploads', adminAuth, express.static(uploadsDir));
 
+// 管理者向け: 免許証画像の安全な配信（imgタグでも閲覧できるよう token クエリを許可）
+app.get('/api/admin/license/:filename', adminAuth, async (req, res, next) => {
+  try {
+    const safeName = path.basename(req.params.filename || '');
+    if (!safeName) return res.status(400).json({ error: 'ファイル名が不正です' });
+    const fp = path.join(uploadsDir, safeName);
+    if (!fs.existsSync(fp)) return res.status(404).json({ error: 'ファイルが見つかりません' });
+    res.sendFile(fp);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ======================================================
 //  ヘルスチェック
 // ======================================================
@@ -358,7 +373,7 @@ app.get('/api/reservations/dates', async (req, res, next) => {
     for (const r of list) {
       const s = new Date(r.start);
       const e = new Date(r.end);
-      for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(s); d < e; d.setDate(d.getDate() + 1)) {
         booked.add(d.toISOString().slice(0, 10));
       }
     }
@@ -399,14 +414,19 @@ app.post('/api/reserve',
       if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
         return res.status(400).json({ error: '日付形式が不正です' });
       }
-      if (new Date(start) > new Date(end)) {
-        return res.status(400).json({ error: '終了日は開始日以降にしてください' });
+      if (new Date(start) >= new Date(end)) {
+        return res.status(400).json({ error: '終了日は開始日の翌日以降にしてください' });
       }
       // 過去の日付チェック
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (new Date(start) < today) {
         return res.status(400).json({ error: '過去の日付は指定できません' });
+      }
+
+      // 免許証アップロード必須（表裏）
+      if (!req.files?.license_front?.[0] || !req.files?.license_back?.[0]) {
+        return res.status(400).json({ error: '免許証の表面・裏面のアップロードは必須です' });
       }
 
       // ダブルブッキングチェック
