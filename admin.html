@@ -243,6 +243,8 @@ let reservations = [];
 let currentFilter = 'all';
 let searchQuery = '';
 let csrfToken = '';
+let hadAuthenticatedSession = false;
+let sessionExpiredNotified = false;
 
 // ── DOM ──
 const $ = id => document.getElementById(id);
@@ -281,6 +283,7 @@ async function tryLogin() {
       body: JSON.stringify({ password: p })
     });
     if (!r.ok) throw 0;
+    sessionExpiredNotified = false;
     loginOverlay.classList.add('hidden');
     await load();
   } catch { loginErr.textContent = 'パスワードが正しくありません'; loginPass.select(); }
@@ -291,12 +294,20 @@ async function load() {
   try {
     const r = await fetch('/api/admin/reservations');
     if (r.status === 401) {
+      csrfToken = '';
+      if (hadAuthenticatedSession && !sessionExpiredNotified) {
+        loginErr.textContent = 'セッションの有効期限が切れました。再ログインしてください。';
+        toast('セッションが切れました。再ログインしてください。', true);
+        sessionExpiredNotified = true;
+      }
       loginOverlay.classList.remove('hidden');
       return;
     }
     reservations = await r.json();
     await fetchCsrfToken();
     render();
+    hadAuthenticatedSession = true;
+    loginErr.textContent = '';
     loginOverlay.classList.add('hidden');
   } catch (e) { console.error(e); }
 }

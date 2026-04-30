@@ -20,6 +20,8 @@ const RATE_MAX_LOGIN = 5;                // ログイン試行上限
 const RATE_CLEANUP_MS = 5 * 60 * 1000;  // クリーンアップ間隔
 const MAX_RATE_ENTRIES = 10_000;         // メモリリーク防止
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 管理セッション有効期限（12時間）
+const AUDIT_LOG_MAX_BYTES = 5 * 1024 * 1024; // 監査ログ1ファイル上限(5MB)
+const AUDIT_LOG_KEEP_FILES = 5; // 保持世代数
 const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
 const ALLOWED_FILE_TYPES = /jpeg|jpg|png|webp|heic|pdf/i;
 
@@ -29,11 +31,15 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const ADMIN_PASS = process.env.ADMIN_PASS;
+const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
 const ADMIN_COOKIE_NAME = 'admin_session';
 
-if (!ADMIN_PASS) {
-  console.error('⛔ ADMIN_PASS が環境変数に設定されていません。サーバーを起動できません。');
+if (!ADMIN_PASS && !ADMIN_PASS_HASH) {
+  console.error('⛔ ADMIN_PASS または ADMIN_PASS_HASH が必要です。サーバーを起動できません。');
   process.exit(1);
+}
+if (ADMIN_PASS && !ADMIN_PASS_HASH) {
+  console.warn('⚠️ ADMIN_PASS_HASH 未設定です。平文パスワード認証で起動します（推奨: ハッシュ化）。');
 }
 
 // ======================================================
@@ -175,6 +181,48 @@ function parseCookies(cookieHeader) {
 }
 
 /**
+ * ADMIN_PASS_HASH (scrypt) の検証
+ * フォーマット: scrypt$N$r$p$saltHex$hashHex
+ * @param {string} inputPassword
+ * @param {string} stored
+ * @returns {boolean}
+ */
+function verifyScryptHash(inputPassword, stored) {
+  if (!stored || !stored.startsWith('scrypt$')) return false;
+  const parts = stored.split('$');
+  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
+  const N = Number(parts[1]);
+  const r = Number(parts[2]);
+  const p = Number(parts[3]);
+  const salt = parts[4];
+  const hash = parts[5];
+  if (!Number.isFinite(N) || !Number.isFinite(r) || !Number.isFinite(p) || !salt || !hash) return false;
+  try {
+    const derived = crypto.scryptSync(inputPassword, Buffer.from(salt, 'hex'), Buffer.from(hash, 'hex').length, {
+      N,
+      r,
+      p,
+      maxmem: 64 * 1024 * 1024
+    }).toString('hex');
+    return safeCompare(derived, hash);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 管理パスワード検証（ハッシュ優先・平文は互換）
+ * @param {string} inputPassword
+ * @returns {boolean}
+ */
+function verifyAdminPassword(inputPassword) {
+  if (typeof inputPassword !== 'string' || !inputPassword) return false;
+  if (ADMIN_PASS_HASH && verifyScryptHash(inputPassword, ADMIN_PASS_HASH)) return true;
+  if (ADMIN_PASS && safeCompare(inputPassword, ADMIN_PASS)) return true;
+  return false;
+}
+
+/**
  * 管理セッションを新規作成
  * @returns {{sessionToken: string, csrfToken: string, expiresAt: number}}
  */
@@ -291,6 +339,7 @@ const reservationsFile = path.join(__dirname, '..', 'reservations.json');
 const adminAuditFile = path.join(__dirname, '..', 'admin-audit.log');
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+let auditWriteQueue = Promise.resolve();
 
 /** 管理操作ログをJSON Lines形式で追記 */
 function writeAdminAudit(req, action, payload = {}) {
@@ -301,7 +350,31 @@ function writeAdminAudit(req, action, payload = {}) {
     ua: req.headers['user-agent'] || '',
     ...payload
   };
-  fs.promises.appendFile(adminAuditFile, JSON.stringify(row) + '\n', 'utf8').catch(() => {});
+  auditWriteQueue = auditWriteQueue
+    .then(async () => {
+      try {
+        const st = await fs.promises.stat(adminAuditFile).catch(() => null);
+        if (st && st.size >= AUDIT_LOG_MAX_BYTES) {
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          const rotated = `${adminAuditFile}.${ts}`;
+          await fs.promises.rename(adminAuditFile, rotated).catch(() => {});
+
+          const allFiles = await fs.promises.readdir(path.dirname(adminAuditFile));
+          const rotatedList = allFiles
+            .filter((f) => f.startsWith(path.basename(adminAuditFile) + '.'))
+            .sort()
+            .reverse();
+          const toDelete = rotatedList.slice(AUDIT_LOG_KEEP_FILES);
+          for (const f of toDelete) {
+            await fs.promises.unlink(path.join(path.dirname(adminAuditFile), f)).catch(() => {});
+          }
+        }
+        await fs.promises.appendFile(adminAuditFile, JSON.stringify(row) + '\n', 'utf8');
+      } catch {
+        // 監査ログ失敗は本処理を止めない
+      }
+    })
+    .catch(() => {});
 }
 
 /** 予約データを非同期で読み込み */
@@ -384,7 +457,7 @@ function adminAuth(req, res, next) {
   const token = tokenFromHeader || tokenFromQuery || tokenFromCookie;
 
   // 互換性: 旧Bearer認証（ADMIN_PASS直指定）
-  if (safeCompare(token, ADMIN_PASS)) {
+  if (ADMIN_PASS && safeCompare(token, ADMIN_PASS)) {
     req.adminLegacy = true;
     return next();
   }
@@ -694,7 +767,7 @@ app.post('/api/admin/login',
   rateLimit(RATE_WINDOW_MS, RATE_MAX_LOGIN),
   (req, res) => {
     const { password } = req.body || {};
-    if (!password || !safeCompare(password, ADMIN_PASS)) {
+    if (!password || !verifyAdminPassword(password)) {
       writeAdminAudit(req, 'admin_login_failed');
       return res.status(401).json({ error: 'パスワードが正しくありません' });
     }
