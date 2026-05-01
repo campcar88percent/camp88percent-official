@@ -7,7 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const multer = require('multer');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const helmet = require('helmet');
 const compression = require('compression');
 
@@ -30,8 +30,8 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
-const SMTP_USER = process.env.SMTP_USER || '';
-const SMTP_PASS = process.env.SMTP_PASS || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const MAIL_FROM = process.env.MAIL_FROM || 'onboarding@resend.dev';
 const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
 const ADMIN_COOKIE_NAME = 'admin_session';
 
@@ -262,21 +262,12 @@ function getAdminSession(sessionToken) {
 // ======================================================
 //  メール設定
 // ======================================================
-let transporter = null;
-if (SMTP_PASS) {
-  transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,  // STARTTLS
-    family: 4,      // IPv4 強制（Render 無料プランは IPv6 アウトバウンド不可）
-    auth: { user: SMTP_USER, pass: SMTP_PASS }
-  });
-  transporter.verify((err) => {
-    if (err) console.error('[MAIL] SMTP 接続エラー:', err.message, err.code || '');
-    else console.log('[MAIL] SMTP 接続OK — メール通知有効 user=' + SMTP_USER);
-  });
+let resend = null;
+if (RESEND_API_KEY) {
+  resend = new Resend(RESEND_API_KEY);
+  console.log('[MAIL] Resend 初期化完了 — メール通知有効');
 } else {
-  console.log('[MAIL] SMTP_PASS 未設定 — メール通知は無効（予約は保存されます）');
+  console.log('[MAIL] RESEND_API_KEY 未設定 — メール通知は無効（予約は保存されます）');
 }
 
 // ======================================================
@@ -325,7 +316,7 @@ function getMailBaseUrl() {
  * @param {Object} entry - 予約データ
  */
 async function sendReservationEmail(entry) {
-  if (!transporter) return;
+  if (!resend) return;
   const plan = determinePlan(entry.start, entry.end);
   const total = plan.pricePerDay * plan.nights;
   const mailBaseUrl = getMailBaseUrl();
@@ -358,12 +349,13 @@ async function sendReservationEmail(entry) {
   `;
 
   try {
-    await transporter.sendMail({
-      from: `"88CAMPCAR" <${SMTP_USER}>`,
+    const { error } = await resend.emails.send({
+      from: `88CAMPCAR <${MAIL_FROM}>`,
       to: ADMIN_EMAIL,
       subject: `【新規予約】${entry.name}様 ${entry.start}〜${entry.end}（${plan.name}）`,
       html
     });
+    if (error) throw new Error(error.message);
     console.log(`[MAIL] 予約通知メール送信完了 → ${ADMIN_EMAIL}`);
   } catch (err) {
     console.error('[MAIL] メール送信エラー:', err.message);
@@ -375,7 +367,7 @@ async function sendReservationEmail(entry) {
  * @param {Object} entry - 予約データ
  */
 async function sendReservationAutoReply(entry) {
-  if (!transporter) return;
+  if (!resend) return;
   const plan = determinePlan(entry.start, entry.end);
   const total = plan.pricePerDay * plan.nights;
   const text = `${entry.name}様
@@ -395,12 +387,13 @@ async function sendReservationAutoReply(entry) {
 ${BASE_URL}`;
 
   try {
-    await transporter.sendMail({
-      from: `"88CAMPCAR" <${SMTP_USER}>`,
+    const { error } = await resend.emails.send({
+      from: `88CAMPCAR <${MAIL_FROM}>`,
       to: entry.email,
       subject: `【88CAMPCAR】ご予約ありがとうございます (${entry.start}〜${entry.end})`,
       text
     });
+    if (error) throw new Error(error.message);
     console.log(`[MAIL] 予約確認メール送信完了 → ${entry.email}`);
   } catch (err) {
     console.error('[MAIL] 予約確認メール送信エラー:', err.message);
@@ -593,24 +586,20 @@ app.get(['/api/health', '/_/health', '/x1/ping'], (_req, res) => {
 
 // メール診断エンドポイント（管理者認証必須）
 app.post('/x1/mail-test', adminAuth, async (req, res) => {
-  if (!transporter) {
-    return res.json({ ok: false, error: 'transporter が null — SMTP_PASS が未設定の可能性があります' });
+  if (!resend) {
+    return res.json({ ok: false, error: 'resend が null — RESEND_API_KEY が未設定の可能性があります' });
   }
   try {
-    await transporter.verify();
-  } catch (err) {
-    return res.json({ ok: false, step: 'verify', error: err.message, code: err.code });
-  }
-  try {
-    const info = await transporter.sendMail({
-      from: `"88CAMPCAR" <${SMTP_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: `88CAMPCAR <${MAIL_FROM}>`,
       to: ADMIN_EMAIL,
       subject: '【診断テスト】Render からのメール送信確認',
-      text: 'Render サーバーからのメール送信テストです。このメールが届いていれば正常です。'
+      text: 'Render サーバーからの Resend メールテストです。このメールが届いていれば正常です。'
     });
-    return res.json({ ok: true, messageId: info.messageId, to: ADMIN_EMAIL });
+    if (error) return res.json({ ok: false, step: 'sendMail', error: error.message });
+    return res.json({ ok: true, messageId: data?.id, to: ADMIN_EMAIL });
   } catch (err) {
-    return res.json({ ok: false, step: 'sendMail', error: err.message, code: err.code });
+    return res.json({ ok: false, step: 'sendMail', error: err.message });
   }
 });
 
@@ -728,7 +717,7 @@ const RATE_MAX_CONTACT = 5; // 15分間に5件まで
  * @param {Object} data - { name, email, subject, message }
  */
 async function sendContactAutoReply(data) {
-  if (!transporter) return;
+  if (!resend) return;
   const text = `${data.name}様　お問い合わせありがとうございます。
 
 お問い合わせ内容
@@ -762,12 +751,13 @@ ${BASE_URL}
 本メールは 88PERCENT　88CAMPCARレンタルシステム（${BASE_URL}）のお問い合わせフォームから送信されました`;
 
   try {
-    await transporter.sendMail({
-      from: `"88CAMPCAR" <${SMTP_USER}>`,
+    const { error } = await resend.emails.send({
+      from: `88CAMPCAR <${MAIL_FROM}>`,
       to: data.email,
       subject: `【88CAMPCAR】お問い合わせありがとうございます — ${data.subject}`,
       text
     });
+    if (error) throw new Error(error.message);
     console.log(`[MAIL] お問い合わせ自動返信送信完了 → ${data.email}`);
   } catch (err) {
     console.error('[MAIL] お問い合わせ自動返信エラー:', err.message);
@@ -779,7 +769,7 @@ ${BASE_URL}
  * @param {Object} data - { name, email, subject, message }
  */
 async function sendContactNotification(data) {
-  if (!transporter || !ADMIN_EMAIL) return;
+  if (!resend || !ADMIN_EMAIL) return;
   const html = `
     <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;border:2px solid #111;border-radius:8px;overflow:hidden;">
       <div style="background:#111;color:#fff;padding:20px 24px;">
@@ -804,13 +794,14 @@ async function sendContactNotification(data) {
   `;
 
   try {
-    await transporter.sendMail({
-      from: `"88CAMPCAR" <${SMTP_USER}>`,
+    const { error } = await resend.emails.send({
+      from: `88CAMPCAR <${MAIL_FROM}>`,
       to: ADMIN_EMAIL,
       replyTo: data.email,
       subject: `【お問い合わせ】${data.name}様 — ${data.subject}`,
       html
     });
+    if (error) throw new Error(error.message);
     console.log(`[MAIL] お問い合わせ管理者通知送信完了 → ${ADMIN_EMAIL}`);
   } catch (err) {
     console.error('[MAIL] お問い合わせ管理者通知エラー:', err.message);
