@@ -367,6 +367,43 @@ async function sendReservationEmail(entry) {
   }
 }
 
+/**
+ * 予約確認メール送信（お客様宛て）
+ * @param {Object} entry - 予約データ
+ */
+async function sendReservationAutoReply(entry) {
+  if (!transporter) return;
+  const plan = determinePlan(entry.start, entry.end);
+  const total = plan.pricePerDay * plan.nights;
+  const text = `${entry.name}様
+
+このたびは 88CAMPCAR へご予約いただきありがとうございます。
+以下の内容で仮予約を受け付けました。
+
+予約ID: ${entry.id}
+期間: ${entry.start} 〜 ${entry.end}
+プラン: ${plan.name}（${plan.nights}泊）
+料金目安: ¥${total.toLocaleString()}
+車両: ${entry.vehicle}
+
+内容確認のうえ、必要に応じて担当よりご連絡いたします。
+
+88CAMPCAR
+${BASE_URL}`;
+
+  try {
+    await transporter.sendMail({
+      from: `"88CAMPCAR" <${SMTP_USER}>`,
+      to: entry.email,
+      subject: `【88CAMPCAR】ご予約ありがとうございます (${entry.start}〜${entry.end})`,
+      text
+    });
+    console.log(`[MAIL] 予約確認メール送信完了 → ${entry.email}`);
+  } catch (err) {
+    console.error('[MAIL] 予約確認メール送信エラー:', err.message);
+  }
+}
+
 // ======================================================
 //  データストア（JSONファイル）
 // ======================================================
@@ -643,7 +680,10 @@ app.post('/api/reserve',
       await writeReservations(list);
 
       // メール通知（非同期・エラーでも予約は成功）
-      sendReservationEmail(entry).catch(err => console.error('[MAIL] err:', err.message));
+      Promise.allSettled([
+        sendReservationEmail(entry),
+        sendReservationAutoReply(entry)
+      ]).catch(err => console.error('[MAIL] err:', err.message));
 
       res.json({ ok: true, id: entry.id, message: '予約を受け付けました。確認メールをお送りします。' });
     } catch (err) {
