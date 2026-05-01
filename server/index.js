@@ -268,6 +268,7 @@ if (SMTP_PASS) {
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,  // STARTTLS
+    family: 4,      // IPv4 強制（Render 無料プランは IPv6 アウトバウンド不可）
     auth: { user: SMTP_USER, pass: SMTP_PASS }
   });
   transporter.verify((err) => {
