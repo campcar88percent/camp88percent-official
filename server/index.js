@@ -265,12 +265,14 @@ function getAdminSession(sessionToken) {
 let transporter = null;
 if (SMTP_PASS) {
   transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,  // STARTTLS
     auth: { user: SMTP_USER, pass: SMTP_PASS }
   });
   transporter.verify((err) => {
-    if (err) console.error('[MAIL] SMTP 接続エラー:', err.message);
-    else console.log('[MAIL] SMTP 接続OK — メール通知有効');
+    if (err) console.error('[MAIL] SMTP 接続エラー:', err.message, err.code || '');
+    else console.log('[MAIL] SMTP 接続OK — メール通知有効 user=' + SMTP_USER);
   });
 } else {
   console.log('[MAIL] SMTP_PASS 未設定 — メール通知は無効（予約は保存されます）');
@@ -586,6 +588,29 @@ app.get(['/api/admin/license/:filename', '/_/admin/license/:filename', '/x1/r/li
 // ======================================================
 app.get(['/api/health', '/_/health', '/x1/ping'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// メール診断エンドポイント（管理者認証必須）
+app.post('/x1/mail-test', adminAuth, async (req, res) => {
+  if (!transporter) {
+    return res.json({ ok: false, error: 'transporter が null — SMTP_PASS が未設定の可能性があります' });
+  }
+  try {
+    await transporter.verify();
+  } catch (err) {
+    return res.json({ ok: false, step: 'verify', error: err.message, code: err.code });
+  }
+  try {
+    const info = await transporter.sendMail({
+      from: `"88CAMPCAR" <${SMTP_USER}>`,
+      to: ADMIN_EMAIL,
+      subject: '【診断テスト】Render からのメール送信確認',
+      text: 'Render サーバーからのメール送信テストです。このメールが届いていれば正常です。'
+    });
+    return res.json({ ok: true, messageId: info.messageId, to: ADMIN_EMAIL });
+  } catch (err) {
+    return res.json({ ok: false, step: 'sendMail', error: err.message, code: err.code });
+  }
 });
 
 // ======================================================
