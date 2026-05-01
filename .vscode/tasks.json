@@ -2,7 +2,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Start NAGO CAMP Server",
+			"label": "Start 88CAMPCAR Server",
 			"type": "shell",
 			"command": "cd /Users/azamas/Desktop/レンタカーHP && node server/index.js",
 			"isBackground": true,

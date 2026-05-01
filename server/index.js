@@ -4,6 +4,7 @@ const express = require('express');
 require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
@@ -27,6 +28,7 @@ const ALLOWED_FILE_TYPES = /jpeg|jpg|png|webp|heic|pdf/i;
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
@@ -42,6 +44,20 @@ if (!ADMIN_PASS_HASH) {
 //  Express アプリ初期化
 // ======================================================
 const app = express();
+
+// --- ローカル開発時のCORS許可（Safariのlocalhost解決差異対策）---
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
 
 // --- Helmet（セキュリティヘッダー一括設定）---
 app.use(helmet({
@@ -278,6 +294,30 @@ function determinePlan(start, end) {
 }
 
 /**
+ * メールに埋め込むURLを決定
+ * BASE_URL が localhost / 127.0.0.1 の場合は同一Wi-Fi端末から到達できる LAN IP URL を優先
+ * @returns {string}
+ */
+function getMailBaseUrl() {
+  let parsed;
+  try {
+    parsed = new URL(BASE_URL);
+  } catch {
+    return 'http://localhost:3000';
+  }
+
+  const host = (parsed.hostname || '').toLowerCase();
+  if (host !== 'localhost' && host !== '127.0.0.1') {
+    return BASE_URL.replace(/\/+$/, '');
+  }
+
+  const lanIp = getLanIpv4List()[0];
+  if (!lanIp) return BASE_URL.replace(/\/+$/, '');
+  const portPart = parsed.port ? `:${parsed.port}` : '';
+  return `${parsed.protocol}//${lanIp}${portPart}`;
+}
+
+/**
  * 予約通知メール送信（管理者宛て）
  * @param {Object} entry - 予約データ
  */
@@ -285,6 +325,7 @@ async function sendReservationEmail(entry) {
   if (!transporter) return;
   const plan = determinePlan(entry.start, entry.end);
   const total = plan.pricePerDay * plan.nights;
+  const mailBaseUrl = getMailBaseUrl();
   const html = `
     <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;border:2px solid #111;border-radius:8px;overflow:hidden;">
       <div style="background:#111;color:#fff;padding:20px 24px;">
@@ -304,7 +345,7 @@ async function sendReservationEmail(entry) {
           <tr><td style="padding:8px 0;color:#888;">受付日時</td><td style="padding:8px 0;">${new Date(entry.createdAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td></tr>
         </table>
         <div style="margin-top:20px;text-align:center;">
-          <a href="${BASE_URL}/admin.html" style="display:inline-block;background:#111;color:#fff;padding:12px 28px;text-decoration:none;font-size:13px;font-weight:700;border-radius:6px;letter-spacing:.05em;">管理画面を開く →</a>
+          <a href="${mailBaseUrl}/admin.html" style="display:inline-block;background:#111;color:#fff;padding:12px 28px;text-decoration:none;font-size:13px;font-weight:700;border-radius:6px;letter-spacing:.05em;">管理画面を開く →</a>
         </div>
       </div>
       <div style="background:#f8f8f8;padding:12px 24px;text-align:center;font-size:11px;color:#aaa;">
@@ -329,9 +370,10 @@ async function sendReservationEmail(entry) {
 // ======================================================
 //  データストア（JSONファイル）
 // ======================================================
-const reservationsFile = path.join(__dirname, '..', 'reservations.json');
-const adminAuditFile = path.join(__dirname, '..', 'admin-audit.log');
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+const reservationsFile = path.join(DATA_DIR, 'reservations.json');
+const adminAuditFile = path.join(DATA_DIR, 'admin-audit.log');
+const uploadsDir = path.join(DATA_DIR, 'uploads');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 let auditWriteQueue = Promise.resolve();
 
@@ -490,7 +532,7 @@ app.use(express.static(path.join(__dirname, '..'), {
 app.use('/uploads', adminAuth, express.static(uploadsDir));
 
 // 管理者向け: 免許証画像の安全な配信
-app.get('/api/admin/license/:filename', adminAuth, async (req, res, next) => {
+app.get(['/api/admin/license/:filename', '/_/admin/license/:filename', '/x1/r/license/:filename'], adminAuth, async (req, res, next) => {
   try {
     const safeName = path.basename(req.params.filename || '');
     if (!safeName) return res.status(400).json({ error: 'ファイル名が不正です' });
@@ -505,7 +547,7 @@ app.get('/api/admin/license/:filename', adminAuth, async (req, res, next) => {
 // ======================================================
 //  ヘルスチェック
 // ======================================================
-app.get('/api/health', (_req, res) => {
+app.get(['/api/health', '/_/health', '/x1/ping'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -748,7 +790,7 @@ app.post('/api/contact',
 // ======================================================
 
 // 管理者ログイン検証（レート制限付き）
-app.post('/api/admin/login',
+app.post(['/api/admin/login', '/_/admin/login', '/x1/r/login'],
   rateLimit(RATE_WINDOW_MS, RATE_MAX_LOGIN),
   (req, res) => {
     const { password } = req.body || {};
@@ -771,7 +813,7 @@ app.post('/api/admin/login',
 );
 
 // 管理者ログアウト
-app.post('/api/admin/logout', adminAuth, (req, res) => {
+app.post(['/api/admin/logout', '/_/admin/logout', '/x1/r/logout'], adminAuth, (req, res) => {
   if (req.adminSessionToken) adminSessionMap.delete(req.adminSessionToken);
   res.clearCookie(ADMIN_COOKIE_NAME, {
     httpOnly: true,
@@ -784,7 +826,7 @@ app.post('/api/admin/logout', adminAuth, (req, res) => {
 });
 
 // 管理画面用CSRFトークン取得
-app.get('/api/admin/csrf', adminAuth, (req, res) => {
+app.get(['/api/admin/csrf', '/_/admin/csrf', '/x1/r/csrf'], adminAuth, (req, res) => {
   if (req.adminSession?.csrfToken) {
     return res.json({ ok: true, csrfToken: req.adminSession.csrfToken });
   }
@@ -792,7 +834,7 @@ app.get('/api/admin/csrf', adminAuth, (req, res) => {
 });
 
 // 全予約取得
-app.get('/api/admin/reservations', adminAuth, async (req, res, next) => {
+app.get(['/api/admin/reservations', '/_/admin/reservations', '/x1/r/list'], adminAuth, async (req, res, next) => {
   try {
     const list = (await readReservations()).sort((a, b) =>
       new Date(b.createdAt) - new Date(a.createdAt)
@@ -804,7 +846,7 @@ app.get('/api/admin/reservations', adminAuth, async (req, res, next) => {
 });
 
 // 予約ステータス更新
-app.patch('/api/admin/reservations/:id', adminAuth, requireAdminCsrf, async (req, res, next) => {
+app.patch(['/api/admin/reservations/:id', '/_/admin/reservations/:id', '/x1/r/item/:id'], adminAuth, requireAdminCsrf, async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
@@ -827,7 +869,7 @@ app.patch('/api/admin/reservations/:id', adminAuth, requireAdminCsrf, async (req
 });
 
 // 予約削除
-app.delete('/api/admin/reservations/:id', adminAuth, requireAdminCsrf, async (req, res, next) => {
+app.delete(['/api/admin/reservations/:id', '/_/admin/reservations/:id', '/x1/r/item/:id'], adminAuth, requireAdminCsrf, async (req, res, next) => {
   try {
     let list = await readReservations();
     const target = list.find(r => r.id === req.params.id);
@@ -882,8 +924,24 @@ app.use((err, _req, res, _next) => {
 // ======================================================
 //  サーバー起動 & グレースフルシャットダウン
 // ======================================================
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[SERVER] Running: http://0.0.0.0:${PORT}`);
+function getLanIpv4List() {
+  const nets = os.networkInterfaces();
+  const addrs = [];
+  for (const items of Object.values(nets)) {
+    for (const info of items || []) {
+      if (info && info.family === 'IPv4' && !info.internal) addrs.push(info.address);
+    }
+  }
+  return [...new Set(addrs)];
+}
+
+const server = app.listen({ port: PORT, host: '::', ipv6Only: false }, () => {
+  console.log(`[SERVER] Running: http://localhost:${PORT}`);
+  console.log(`[SERVER] Admin:   http://localhost:${PORT}/admin.html`);
+  const lanIps = getLanIpv4List();
+  for (const ip of lanIps) {
+    console.log(`[SERVER] LAN:     http://${ip}:${PORT}/admin.html`);
+  }
 });
 
 function gracefulShutdown(signal) {

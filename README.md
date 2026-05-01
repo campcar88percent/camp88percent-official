@@ -74,3 +74,27 @@ npm start
 
 - ファイル: `admin-audit.log`
 - 自動ローテーション: 5MBごと、最大5世代保持
+
+## Render デプロイ（本番URL運用）
+
+1. Renderで `Blueprint` か `New Web Service` を作成し、`render.yaml` を使用
+2. 環境変数を設定
+
+- `ADMIN_PASS_HASH`（必須）
+- `ADMIN_EMAIL`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `BASE_URL`（例: `https://88campcar.onrender.com`）
+
+1. `BASE_URL` は必ず本番URL（https）にする
+
+- メール内の「管理画面を開く」リンク生成に使用されます
+- `localhost` のままだと iPhone から開けません
+
+1. 永続データ保存
+
+- `DATA_DIR=/opt/render/project/src/storage` を使用
+- 以下が永続ディスクに保存されます
+- `reservations.json`
+- `admin-audit.log`
+- `uploads/`（免許証画像）

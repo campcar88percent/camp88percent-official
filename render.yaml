@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: nago-camp
+    name: 88campcar
     runtime: node
     plan: free
     buildCommand: npm install
@@ -8,7 +8,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: ADMIN_PASS
+      - key: ADMIN_PASS_HASH
         sync: false
       - key: ADMIN_EMAIL
         sync: false
@@ -18,7 +18,9 @@ services:
         sync: false
       - key: BASE_URL
         sync: false
+      - key: DATA_DIR
+        value: /opt/render/project/src/storage
     disk:
       name: uploads
-      mountPath: /opt/render/project/src/uploads
+      mountPath: /opt/render/project/src/storage
       sizeGB: 1

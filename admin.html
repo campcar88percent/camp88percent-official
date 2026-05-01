@@ -59,6 +59,7 @@
   }
   .login-box button:hover { background: #f97316; }
   .login-err { color: #ef4444; font-size: 12px; font-weight: 700; margin-top: 10px; }
+  .login-diag { color: #666; font-size: 11px; margin-top: 8px; line-height: 1.4; word-break: break-all; }
   .login-overlay.hidden { display: none; }
 
   /* ── Stats Bar ── */
@@ -198,6 +199,7 @@
     <input type="password" id="login-pass" placeholder="パスワード" autocomplete="off" />
     <button id="login-btn">ログイン</button>
     <div class="login-err" id="login-err"></div>
+    <div class="login-diag" id="login-diag"></div>
   </div>
 </div>
 
@@ -238,6 +240,14 @@
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <script>
+// ローカル環境は 127.0.0.1:3000 に統一して、localhost の名前解決差異を回避する
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  const localTarget = `http://127.0.0.1:3000${location.pathname}${location.search}${location.hash}`;
+  if (location.href !== localTarget) {
+    location.replace(localTarget);
+  }
+}
+
 // ── State ──
 let reservations = [];
 let currentFilter = 'all';
@@ -252,19 +262,108 @@ const loginOverlay = $('login-overlay');
 const loginPass = $('login-pass');
 const loginBtn = $('login-btn');
 const loginErr = $('login-err');
+const loginDiag = $('login-diag');
 const cardList = $('card-list');
 const searchInput = $('search-input');
 const lightbox = $('lightbox');
 const lightboxImg = $('lightbox-img');
 
+const localApiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://127.0.0.1:3000'
+  : '';
+const adminApiPrefix = '/x1/r';
+const healthPath = '/x1/ping';
+const suggestedAdminUrl = `${location.origin}/admin.html`;
+
+async function apiFetch(input, init = {}) {
+  const opts = { credentials: 'same-origin', ...init };
+  try {
+    return await fetch(input, opts);
+  } catch (firstErr) {
+    // iPhone の一部ブラウザ/インアプリWebViewで fetch が失敗する場合に XHR へフォールバック
+    try {
+      return await xhrFetchLike(input, opts);
+    } catch (secondErr) {
+      if (typeof input === 'string' && input.startsWith('/') && localApiBase) {
+        try {
+          return await fetch(`${localApiBase}${input}`, opts);
+        } catch {
+          return xhrFetchLike(`${localApiBase}${input}`, opts);
+        }
+      }
+      throw secondErr || firstErr;
+    }
+  }
+}
+
+function xhrFetchLike(input, init = {}) {
+  return new Promise((resolve, reject) => {
+    const url = typeof input === 'string' ? input : String(input);
+    const method = (init.method || 'GET').toUpperCase();
+    const headers = init.headers || {};
+    const body = init.body;
+    const timeoutMs = 10_000;
+
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.withCredentials = true;
+    xhr.timeout = timeoutMs;
+
+    if (headers && typeof headers === 'object') {
+      for (const [k, v] of Object.entries(headers)) {
+        if (typeof v !== 'undefined') xhr.setRequestHeader(k, String(v));
+      }
+    }
+
+    xhr.onload = () => {
+      const responseText = xhr.responseText || '';
+      const status = xhr.status || 0;
+      resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        text: async () => responseText,
+        json: async () => {
+          try { return JSON.parse(responseText || '{}'); }
+          catch { throw new Error('Invalid JSON response'); }
+        }
+      });
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.ontimeout = () => reject(new Error('Network timeout'));
+
+    if (typeof body === 'undefined' || body === null) xhr.send();
+    else xhr.send(body);
+  });
+}
+
+function renderDiag(msg) {
+  if (!loginDiag) return;
+  loginDiag.textContent = `現在: ${location.origin}${location.pathname} | ${msg}`;
+}
+
+async function checkApiConnectivity() {
+  try {
+    const r = await apiFetch(healthPath, { cache: 'no-store' });
+    if (!r.ok) {
+      renderDiag(`API応答異常 (${r.status})`);
+      return;
+    }
+    renderDiag('API接続OK');
+  } catch {
+    renderDiag('API接続NG（ブラウザ側の通信遮断の可能性）');
+  }
+}
+
 // ── Auth ──
 load();
+renderDiag('診断中...');
+checkApiConnectivity();
 
 loginBtn.addEventListener('click', tryLogin);
 loginPass.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 $('btn-logout').addEventListener('click', async () => {
   try {
-    await fetch('/api/admin/logout', {
+    await apiFetch(`${adminApiPrefix}/logout`, {
       method: 'POST',
       headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {}
     });
@@ -277,22 +376,33 @@ async function tryLogin() {
   if (!p) return;
   loginErr.textContent = '';
   try {
-    const r = await fetch('/api/admin/login', {
+    const r = await apiFetch(`${adminApiPrefix}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: p })
     });
-    if (!r.ok) throw 0;
+    if (r.status === 401) {
+      loginErr.textContent = 'パスワードが正しくありません';
+      loginPass.select();
+      return;
+    }
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     sessionExpiredNotified = false;
     loginOverlay.classList.add('hidden');
     await load();
-  } catch { loginErr.textContent = 'パスワードが正しくありません'; loginPass.select(); }
+  } catch {
+    if (location.protocol === 'file:') {
+      loginErr.textContent = 'このページはURL直開き不可です。http://127.0.0.1:3000/admin.html で開いてください。';
+      return;
+    }
+    loginErr.textContent = `サーバーに接続できません。${suggestedAdminUrl} を開き直してください。`;
+  }
 }
 
 // ── Load ──
 async function load() {
   try {
-    const r = await fetch('/api/admin/reservations');
+    const r = await apiFetch(`${adminApiPrefix}/list`);
     if (r.status === 401) {
       csrfToken = '';
       if (hadAuthenticatedSession && !sessionExpiredNotified) {
@@ -309,12 +419,20 @@ async function load() {
     hadAuthenticatedSession = true;
     loginErr.textContent = '';
     loginOverlay.classList.add('hidden');
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+    loginOverlay.classList.remove('hidden');
+    if (location.protocol === 'file:') {
+      loginErr.textContent = '管理画面は http://127.0.0.1:3000/admin.html で開いてください。';
+    } else {
+      loginErr.textContent = `サーバーに接続できません。${suggestedAdminUrl} を開き直してください。`;
+    }
+  }
 }
 
 async function fetchCsrfToken() {
   try {
-    const r = await fetch('/api/admin/csrf', { cache: 'no-store' });
+    const r = await apiFetch(`${adminApiPrefix}/csrf`, { cache: 'no-store' });
     if (!r.ok) throw new Error('csrf');
     const data = await r.json();
     csrfToken = data.csrfToken || '';
@@ -341,7 +459,7 @@ function fmtD(d) { return d ? d.replace(/-/g, '/') : '—'; }
 function fmtDT(iso) { return iso ? new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'; }
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function licenseUrl(filename) {
-  return `/api/admin/license/${encodeURIComponent(filename)}`;
+  return `${adminApiPrefix}/license/${encodeURIComponent(filename)}`;
 }
 
 // ── Render ──
@@ -416,7 +534,7 @@ function toggle(id) {
 // ── Actions ──
 async function act(id, status) {
   try {
-    const r = await fetch(`/api/admin/reservations/${id}`, {
+    const r = await apiFetch(`${adminApiPrefix}/item/${id}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -438,7 +556,7 @@ async function act(id, status) {
 async function del(id, name) {
   if (!confirm(`${name}様の予約を削除しますか？\n（免許証画像も削除されます）`)) return;
   try {
-    const r = await fetch(`/api/admin/reservations/${id}`, {
+    const r = await apiFetch(`${adminApiPrefix}/item/${id}`, {
       method: 'DELETE',
       headers: { 'X-CSRF-Token': csrfToken }
     });
