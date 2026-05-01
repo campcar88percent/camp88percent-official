@@ -493,6 +493,7 @@ function render() {
           <span class="card-name">${esc(r.name)}</span>
           <span class="card-plan ${p.cls}">${p.name}</span>
           <span class="card-dates">${fmtD(r.start)} → ${fmtD(r.end)}</span>
+          <button class="action-btn btn-delete" style="margin-left:auto;margin-right:8px;padding:4px 10px;font-size:12px;" onclick="event.stopPropagation();del('${r.id}','${esc(r.name)}')">🗑 削除</button>
           <svg class="card-chevron" id="ch-${r.id}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
         </div>
         <div class="card-body" id="bd-${r.id}">
