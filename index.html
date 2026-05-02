@@ -876,6 +876,19 @@ document.getElementById('stripe-pay-btn').addEventListener('click', goToStripe);
 <script type="module" src="script.js"></script>
 
 <!-- 予約モーダル -->
+<!-- 予約成功バナー -->
+<div id="booking-success-banner" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4">
+	<div class="bg-white rounded-2xl shadow-2xl p-8 md:p-12 max-w-md w-full text-center">
+		<div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+			<svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+		</div>
+		<h2 class="text-2xl font-black mb-2">ご予約が確定しました</h2>
+		<p id="booking-success-detail" class="text-sm text-black/60 mb-6 leading-relaxed"></p>
+		<p class="text-xs text-black/40 mb-6">確認メールをお送りしました。ご乗車当日に運転免許証をご持参ください。</p>
+		<button id="booking-success-close" class="bg-black text-white px-8 py-3 rounded font-black text-sm tracking-wider hover:bg-black/80 transition-colors">閉じる</button>
+	</div>
+</div>
+
 <div id="reserve-modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="reserve-modal-title" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4">
 	<div class="bg-white w-full max-w-xl rounded-lg shadow-xl p-6 md:p-10 max-h-[90vh] overflow-y-auto">
 		<div class="flex justify-between items-center mb-6">
@@ -895,7 +908,7 @@ document.getElementById('stripe-pay-btn').addEventListener('click', goToStripe);
 				</div>
 			</div>
 		</div>
-		<form id="reserve-form" class="space-y-5" enctype="multipart/form-data">
+		<form id="reserve-form" class="space-y-5">
 
 			<!-- お客様情報 -->
 			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2">お客様情報</p>
@@ -916,42 +929,20 @@ document.getElementById('stripe-pay-btn').addEventListener('click', goToStripe);
 			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2 mt-6">利用期間</p>
 			<div class="grid grid-cols-2 gap-4">
 				<div>
-					<label class="block text-xs font-bold mb-1">開始日 <span class="text-red-500">*</span></label>
-			<input name="start" type="date" required readonly class="w-full border border-black/20 rounded px-3 py-2.5 text-sm bg-gray-50 outline-none cursor-not-allowed" />
+					<label class="block text-xs font-bold mb-1">開始日</label>
+					<input name="start" type="date" required readonly class="w-full border border-black/20 rounded px-3 py-2.5 text-sm bg-gray-50 outline-none cursor-not-allowed" />
 				</div>
 				<div>
-					<label class="block text-xs font-bold mb-1">終了日 <span class="text-red-500">*</span></label>
-			<input name="end" type="date" required readonly class="w-full border border-black/20 rounded px-3 py-2.5 text-sm bg-gray-50 outline-none cursor-not-allowed" />
+					<label class="block text-xs font-bold mb-1">終了日</label>
+					<input name="end" type="date" required readonly class="w-full border border-black/20 rounded px-3 py-2.5 text-sm bg-gray-50 outline-none cursor-not-allowed" />
 				</div>
 			</div>
 
-			<!-- 免許証 -->
-			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2 mt-6">運転免許証</p>
-			<div class="grid grid-cols-2 gap-4">
-				<div>
-					<label class="block text-xs font-bold mb-1">表面 <span class="text-red-500">*</span></label>
-					<label class="license-upload-area" id="upload-front-area">
-						<input name="license_front" type="file" accept="image/*,.pdf" required class="hidden" id="license-front-input" />
-						<div class="flex flex-col items-center gap-1 text-black/40" id="upload-front-placeholder">
-							<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-							<span class="text-xs font-bold">タップして撮影/選択</span>
-						</div>
-						<img id="preview-front" class="hidden w-full h-full object-cover rounded" />
-					</label>
-				</div>
-				<div>
-					<label class="block text-xs font-bold mb-1">裏面 <span class="text-red-500">*</span></label>
-					<label class="license-upload-area" id="upload-back-area">
-						<input name="license_back" type="file" accept="image/*,.pdf" required class="hidden" id="license-back-input" />
-						<div class="flex flex-col items-center gap-1 text-black/40" id="upload-back-placeholder">
-							<svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-							<span class="text-xs font-bold">タップして撮影/選択</span>
-						</div>
-						<img id="preview-back" class="hidden w-full h-full object-cover rounded" />
-					</label>
-				</div>
+			<!-- 免許証案内 -->
+			<div class="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex gap-3 items-start">
+				<svg class="w-5 h-5 text-blue-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+				<p class="text-xs text-blue-700 leading-relaxed">運転免許証はご乗車当日にご持参ください。オンライン上でのアップロードは不要です。</p>
 			</div>
-			<p class="text-xs text-black/40">※ 画像はJPEG/PNG/WEBP/PDF（10MB以下）</p>
 
 			<!-- 貸渡契約書 -->
 			<p class="text-xs font-black text-black/40 uppercase tracking-widest border-b pb-2 mt-6">貸渡契約書</p>

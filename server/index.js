@@ -83,6 +83,49 @@ app.use(helmet({
 // --- 圧縮 ---
 app.use(compression());
 
+// --- Stripe Webhook（raw body が必要なため JSON パーサーより前に登録）---
+app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+  if (!webhookSecret || !stripe) return res.status(503).send('Webhook 未設定');
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    console.error('[WEBHOOK] 署名検証失敗:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    if (session.payment_status !== 'paid') return res.json({ received: true });
+
+    const reservationId = session.metadata?.reservationId;
+    if (!reservationId) return res.json({ received: true });
+
+    try {
+      const list = await readReservations();
+      const idx = list.findIndex(r => r.id === reservationId);
+      if (idx !== -1 && list[idx].status === 'pending_payment') {
+        list[idx].status = 'pending';
+        list[idx].stripeSessionId = session.id;
+        list[idx].updatedAt = new Date().toISOString();
+        await writeReservations(list);
+        Promise.allSettled([
+          sendReservationEmail(list[idx]),
+          sendReservationAutoReply(list[idx])
+        ]).catch(err => console.error('[MAIL] err:', err.message));
+        console.log(`[WEBHOOK] 予約確定: ${reservationId}`);
+      }
+    } catch (err) {
+      console.error('[WEBHOOK] 予約確定エラー:', err.message);
+    }
+  }
+
+  res.json({ received: true });
+});
+
 // --- JSON パーサー ---
 app.use(express.json({ limit: '1mb' }));
 
@@ -382,18 +425,24 @@ async function sendReservationAutoReply(entry) {
   const text = `${entry.name}様
 
 このたびは 88CAMPCAR へご予約いただきありがとうございます。
-以下の内容で仮予約を受け付けました。
+以下の内容でご予約が確定しました。
 
+━━━━━━━━━━━━━━━━━━━━
 予約ID: ${entry.id}
-期間: ${entry.start} 〜 ${entry.end}
-プラン: ${plan.name}（${plan.nights}泊）
-料金目安: ¥${total.toLocaleString()}
-車両: ${entry.vehicle}
+期間　: ${entry.start} 〜 ${entry.end}（${plan.nights}泊）
+プラン: ${plan.name}
+料金　: ¥${total.toLocaleString()}
+車両　: ${entry.vehicle}
+━━━━━━━━━━━━━━━━━━━━
 
-内容確認のうえ、必要に応じて担当よりご連絡いたします。
+【免許証について】
+ご乗車当日に運転免許証をご持参ください。
+ご不明な点はお気軽にお問い合わせください。
 
 88CAMPCAR
-${BASE_URL}`;
+${BASE_URL}
+担当：鈴木 / 080-8520-6929
+営業時間 9時〜18時（年中無休）`;
 
   try {
     const { error } = await resend.emails.send({
@@ -661,13 +710,9 @@ app.get('/api/reservations/dates', async (req, res, next) => {
   }
 });
 
-// 予約情報を受け取りStripe Checkout Sessionを作成
+// 予約情報を受け取りStripe Checkout Sessionを作成（免許証はご来店時確認）
 app.post('/api/checkout-with-reservation',
   rateLimit(RATE_WINDOW_MS, RATE_MAX_RESERVE),
-  upload.fields([
-    { name: 'license_front', maxCount: 1 },
-    { name: 'license_back', maxCount: 1 }
-  ]),
   async (req, res, next) => {
     try {
       if (!stripe) return res.status(503).json({ error: 'Stripe が設定されていません' });
@@ -691,8 +736,6 @@ app.post('/api/checkout-with-reservation',
       const today = new Date(); today.setHours(0, 0, 0, 0);
       if (new Date(start) < today)
         return res.status(400).json({ error: '過去の日付は指定できません' });
-      if (!req.files?.license_front?.[0] || !req.files?.license_back?.[0])
-        return res.status(400).json({ error: '免許証の表面・裏面のアップロードは必須です' });
 
       // 1時間以上経過した pending_payment は無効とみなす
       const list = await readReservations();
@@ -711,8 +754,6 @@ app.post('/api/checkout-with-reservation',
         id: generateId(),
         name, email, phone, start, end,
         vehicle: 'スーパーロングハイエース',
-        licenseFront: req.files?.license_front?.[0]?.filename || null,
-        licenseBack:  req.files?.license_back?.[0]?.filename  || null,
         status: 'pending_payment',
         createdAt: new Date().toISOString()
       };
