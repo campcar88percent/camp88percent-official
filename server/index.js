@@ -8,6 +8,7 @@ const os = require('os');
 const crypto = require('crypto');
 const multer = require('multer');
 const { Resend } = require('resend');
+const Stripe = require('stripe');
 const helmet = require('helmet');
 const compression = require('compression');
 
@@ -34,6 +35,8 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const MAIL_FROM = process.env.MAIL_FROM || 'onboarding@resend.dev';
 const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
 const ADMIN_COOKIE_NAME = 'admin_session';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const stripe = STRIPE_SECRET_KEY ? Stripe(STRIPE_SECRET_KEY) : null;
 
 if (!ADMIN_PASS_HASH) {
   console.error('⛔ ADMIN_PASS_HASH が未設定です。ハッシュ必須モードのためサーバーを起動できません。');
@@ -600,6 +603,33 @@ app.post('/x1/mail-test', adminAuth, async (req, res) => {
     return res.json({ ok: true, messageId: data?.id, to: ADMIN_EMAIL });
   } catch (err) {
     return res.json({ ok: false, step: 'sendMail', error: err.message });
+  }
+});
+
+// ======================================================
+//  Stripe Checkout Session API
+// ======================================================
+app.post('/api/create-checkout-session', rateLimit(RATE_WINDOW_MS, 20), async (req, res, next) => {
+  try {
+    if (!stripe) return res.status(503).json({ error: 'Stripe が設定されていません' });
+    const { priceId, quantity } = req.body;
+    if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
+      return res.status(400).json({ error: '無効な Price ID です' });
+    }
+    const qty = parseInt(quantity, 10);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 30) {
+      return res.status(400).json({ error: '無効な数量です' });
+    }
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: qty }],
+      mode: 'payment',
+      success_url: `${BASE_URL}?booking=success`,
+      cancel_url: `${BASE_URL}`,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    next(err);
   }
 });
 
