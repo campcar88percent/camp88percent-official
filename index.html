@@ -488,12 +488,12 @@ index.html の「03 — Pricing」セクションの
   <p class="calc-title">何泊ご利用ですか？</p>
 
   <div class="nights-selector">
-    <button class="nights-btn" onclick="changeNights(-1)">−</button>
+    <button class="nights-btn" id="nights-minus">−</button>
     <div class="nights-display">
       <span id="nights-num">1</span>
       <span class="nights-unit">泊</span>
     </div>
-    <button class="nights-btn" onclick="changeNights(1)">＋</button>
+    <button class="nights-btn" id="nights-plus">＋</button>
   </div>
 
   <div class="calc-result">
@@ -600,6 +600,8 @@ async function goToStripe() {
 
 // 初期化
 updateCalc();
+document.getElementById('nights-minus').addEventListener('click', () => changeNights(-1));
+document.getElementById('nights-plus').addEventListener('click', () => changeNights(1));
 document.getElementById('stripe-pay-btn').addEventListener('click', goToStripe);
 </script>
 	<!-- pricing cards -->
