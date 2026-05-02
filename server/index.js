@@ -283,11 +283,17 @@ if (RESEND_API_KEY) {
  * @param {string} end - YYYY-MM-DD
  * @returns {{ name: string, pricePerDay: number, nights: number }}
  */
+const STRIPE_PRICE_IDS = {
+  short:  'price_1TJqs78bpHlYoUmIXg5t02SS',
+  medium: 'price_1TKetV8bpHlYoUmIWFTIcrDB',
+  weekly: 'price_1TKeuV8bpHlYoUmIBf4Zv9Mo',
+};
+
 function determinePlan(start, end) {
   const nights = Math.round((new Date(end) - new Date(start)) / MS_PER_DAY);
-  if (nights >= 7) return { name: 'Weekly Plan', pricePerDay: 19000, nights };
-  if (nights >= 4) return { name: 'Medium Plan', pricePerDay: 22000, nights };
-  return { name: 'Short Stay', pricePerDay: 26000, nights };
+  if (nights >= 7) return { name: 'Weekly Plan', planKey: 'weekly', pricePerDay: 19000, nights };
+  if (nights >= 4) return { name: 'Medium Plan', planKey: 'medium', pricePerDay: 22000, nights };
+  return { name: 'Short Stay', planKey: 'short', pricePerDay: 26000, nights };
 }
 
 /**
@@ -650,6 +656,141 @@ app.get('/api/reservations/dates', async (req, res, next) => {
       }
     }
     res.json({ booked: [...booked] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 予約情報を受け取りStripe Checkout Sessionを作成
+app.post('/api/checkout-with-reservation',
+  rateLimit(RATE_WINDOW_MS, RATE_MAX_RESERVE),
+  upload.fields([
+    { name: 'license_front', maxCount: 1 },
+    { name: 'license_back', maxCount: 1 }
+  ]),
+  async (req, res, next) => {
+    try {
+      if (!stripe) return res.status(503).json({ error: 'Stripe が設定されていません' });
+
+      const name  = sanitize(req.body?.name);
+      const email = sanitize(req.body?.email);
+      const phone = sanitize(req.body?.phone);
+      const start = sanitize(req.body?.start);
+      const end   = sanitize(req.body?.end);
+
+      if (!name || !email || !phone || !start || !end)
+        return res.status(400).json({ error: '必須項目が不足しています' });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        return res.status(400).json({ error: '有効なメールアドレスを入力してください' });
+      if (!isValidPhone(phone))
+        return res.status(400).json({ error: '有効な電話番号を入力してください' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end))
+        return res.status(400).json({ error: '日付形式が不正です' });
+      if (new Date(start) >= new Date(end))
+        return res.status(400).json({ error: '終了日は開始日の翌日以降にしてください' });
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (new Date(start) < today)
+        return res.status(400).json({ error: '過去の日付は指定できません' });
+      if (!req.files?.license_front?.[0] || !req.files?.license_back?.[0])
+        return res.status(400).json({ error: '免許証の表面・裏面のアップロードは必須です' });
+
+      // 1時間以上経過した pending_payment は無効とみなす
+      const list = await readReservations();
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      const activeList = list.filter(r =>
+        r.status !== 'pending_payment' || new Date(r.createdAt).getTime() > oneHourAgo
+      );
+      if (hasConflict(start, end, null, activeList))
+        return res.status(409).json({ error: 'ご指定の日程は既に予約済みです。別の日程をお選びください。' });
+
+      const plan = determinePlan(start, end);
+      const priceId = STRIPE_PRICE_IDS[plan.planKey];
+
+      // 仮予約を保存（status: pending_payment）
+      const entry = {
+        id: generateId(),
+        name, email, phone, start, end,
+        vehicle: 'スーパーロングハイエース',
+        licenseFront: req.files?.license_front?.[0]?.filename || null,
+        licenseBack:  req.files?.license_back?.[0]?.filename  || null,
+        status: 'pending_payment',
+        createdAt: new Date().toISOString()
+      };
+      list.push(entry);
+      await writeReservations(list);
+
+      // Stripe Checkout Session 作成
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: plan.nights }],
+        mode: 'payment',
+        customer_email: email,
+        metadata: { reservationId: entry.id },
+        success_url: `${BASE_URL}/?booking=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url:  `${BASE_URL}/?booking=cancelled&rid=${entry.id}`,
+      });
+
+      res.json({ url: session.url });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Stripe 決済完了後の予約確定
+app.get('/api/confirm-payment', async (req, res, next) => {
+  try {
+    if (!stripe) return res.status(503).json({ error: 'Stripe が設定されていません' });
+
+    const { session_id } = req.query;
+    if (!session_id || typeof session_id !== 'string')
+      return res.status(400).json({ error: 'session_id が必要です' });
+
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    if (session.payment_status !== 'paid')
+      return res.status(402).json({ error: '支払いが確認できませんでした' });
+
+    const reservationId = session.metadata?.reservationId;
+    if (!reservationId) return res.status(400).json({ error: '予約IDが見つかりません' });
+
+    const list = await readReservations();
+    const idx = list.findIndex(r => r.id === reservationId);
+    if (idx === -1) return res.status(404).json({ error: '予約が見つかりません' });
+    if (list[idx].status !== 'pending_payment')
+      return res.json({ ok: true }); // 既に確定済み
+
+    list[idx].status = 'pending';
+    list[idx].stripeSessionId = session_id;
+    list[idx].updatedAt = new Date().toISOString();
+    await writeReservations(list);
+
+    Promise.allSettled([
+      sendReservationEmail(list[idx]),
+      sendReservationAutoReply(list[idx])
+    ]).catch(err => console.error('[MAIL] err:', err.message));
+
+    res.json({ ok: true, name: list[idx].name });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 決済キャンセル時の仮予約削除
+app.post('/api/cancel-reservation', async (req, res, next) => {
+  try {
+    const { rid } = req.body;
+    if (!rid || typeof rid !== 'string') return res.status(400).json({ error: 'rid が必要です' });
+
+    const list = await readReservations();
+    const idx = list.findIndex(r => r.id === rid && r.status === 'pending_payment');
+    if (idx === -1) return res.json({ ok: true });
+
+    for (const f of [list[idx].licenseFront, list[idx].licenseBack]) {
+      if (f) { try { await fs.promises.unlink(path.join(uploadsDir, f)); } catch {} }
+    }
+    list.splice(idx, 1);
+    await writeReservations(list);
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

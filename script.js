@@ -401,13 +401,42 @@ if (yakkanCheckbox && reserveSubmitBtn) {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.style.display === 'flex') closeYakkan(); });
 })();
 
-// 予約フォーム送信 → サーバーAPI（免許証アップロード必須）
+// 決済完了・キャンセルのハンドリング（Stripeリダイレクト後）
+(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const booking = params.get('booking');
+    const sessionId = params.get('session_id');
+    const rid = params.get('rid');
+
+    if (booking === 'success' && sessionId) {
+        try {
+            const res = await fetch(`/api/confirm-payment?session_id=${encodeURIComponent(sessionId)}`);
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                const msg = `✓ ${data.name || ''}様のご予約が確定しました。確認メールをご確認ください。`;
+                alert(msg);
+            }
+        } catch {}
+        // URLをクリーンに
+        window.history.replaceState({}, '', window.location.pathname);
+    } else if (booking === 'cancelled' && rid) {
+        // 仮予約を削除
+        fetch('/api/cancel-reservation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rid })
+        }).catch(() => {});
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+})();
+
+// 予約フォーム送信 → Stripe Checkout へリダイレクト
 if (reserveForm) {
     reserveForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = document.getElementById('reserve-submit-btn');
         submitBtn.disabled = true;
-        submitBtn.innerText = '送信中...';
+        submitBtn.innerText = '処理中...';
         reserveMessage.innerText = '';
         reserveMessage.className = 'text-sm mt-2 text-center font-bold';
 
@@ -418,43 +447,39 @@ if (reserveForm) {
             reserveMessage.innerText = '終了日は開始日の翌日以降にしてください';
             reserveMessage.classList.add('text-red-500');
             submitBtn.disabled = false;
-            submitBtn.innerText = '予約を送信';
+            submitBtn.innerText = 'お支払いへ進む';
             return;
         }
 
         const frontFile = reserveForm.querySelector('[name="license_front"]').files[0];
-        const backFile = reserveForm.querySelector('[name="license_back"]').files[0];
+        const backFile  = reserveForm.querySelector('[name="license_back"]').files[0];
 
         if (!frontFile || !backFile) {
             reserveMessage.innerText = '免許証の表面・裏面をアップロードしてください。';
             reserveMessage.classList.add('text-red-500');
             submitBtn.disabled = false;
-            submitBtn.innerText = '予約を送信';
+            submitBtn.innerText = 'お支払いへ進む';
             return;
         }
 
         const formData = new FormData(reserveForm);
 
         try {
-            const res = await fetch('/api/reserve', {
+            const res = await fetch('/api/checkout-with-reservation', {
                 method: 'POST',
                 body: formData
             });
             const data = await res.json();
-            if (res.ok && data.ok) {
-                reserveMessage.innerText = '✓ 予約申込を受け付けました。確認メールをご確認ください。';
-                reserveMessage.classList.add('text-green-600');
-                await window.refreshCalendar();
-                setTimeout(closeReserve, 3000);
+            if (res.ok && data.url) {
+                window.location.href = data.url; // Stripe Checkout へリダイレクト
             } else {
                 throw new Error(data.error || '送信に失敗しました');
             }
         } catch (err) {
             reserveMessage.innerText = err.message || '送信に失敗しました。もう一度お試しください。';
             reserveMessage.classList.add('text-red-500');
-        } finally {
             submitBtn.disabled = false;
-            submitBtn.innerText = '予約を送信';
+            submitBtn.innerText = 'お支払いへ進む';
         }
     });
 }
