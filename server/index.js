@@ -170,6 +170,26 @@ const cleanupTimer = setInterval(() => {
 }, RATE_CLEANUP_MS);
 cleanupTimer.unref();
 
+// pending_payment を1時間後に自動削除（1時間ごとに実行）
+const reservationCleanupTimer = setInterval(async () => {
+  try {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const list = await readReservations();
+    const expired = list.filter(r =>
+      r.status === 'pending_payment' && new Date(r.createdAt).getTime() < oneHourAgo
+    );
+    if (expired.length === 0) return;
+    const remaining = list.filter(r =>
+      !(r.status === 'pending_payment' && new Date(r.createdAt).getTime() < oneHourAgo)
+    );
+    await writeReservations(remaining);
+    console.log(`[CLEANUP] pending_payment ${expired.length}件を自動削除しました`);
+  } catch (err) {
+    console.error('[CLEANUP] 自動削除エラー:', err.message);
+  }
+}, 60 * 60 * 1000);
+reservationCleanupTimer.unref();
+
 // ======================================================
 //  ユーティリティ
 // ======================================================
@@ -1076,6 +1096,7 @@ function gracefulShutdown(signal) {
   console.log(`\n[SERVER] ${signal} 受信 — シャットダウン中...`);
   server.close(() => {
     clearInterval(cleanupTimer);
+    clearInterval(reservationCleanupTimer);
     console.log('[SERVER] 正常終了');
     process.exit(0);
   });
