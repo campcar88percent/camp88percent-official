@@ -344,9 +344,9 @@ if (RESEND_API_KEY) {
  * @returns {{ name: string, pricePerDay: number, nights: number }}
  */
 const STRIPE_PRICE_IDS = {
-  short:  'price_1TJqs78bpHlYoUmIXg5t02SS',
-  medium: 'price_1TKetV8bpHlYoUmIWFTIcrDB',
-  weekly: 'price_1TKeuV8bpHlYoUmIBf4Zv9Mo',
+  short:  process.env.STRIPE_PRICE_SHORT  || 'price_1TJqs78bpHlYoUmIXg5t02SS',
+  medium: process.env.STRIPE_PRICE_MEDIUM || 'price_1TKetV8bpHlYoUmIWFTIcrDB',
+  weekly: process.env.STRIPE_PRICE_WEEKLY || 'price_1TKeuV8bpHlYoUmIBf4Zv9Mo',
 };
 
 function determinePlan(start, end) {
