@@ -326,12 +326,6 @@ function closeReserve() {
     reserveModal.setAttribute('aria-hidden', 'true');
     reserveMessage.innerText = '';
     reserveForm.reset();
-    ['front', 'back'].forEach(side => {
-        const preview = document.getElementById(`preview-${side}`);
-        const placeholder = document.getElementById(`upload-${side}-placeholder`);
-        if (preview) { preview.classList.add('hidden'); preview.src = ''; }
-        if (placeholder) placeholder.classList.remove('hidden');
-    });
     const modalPlanInfo = document.getElementById('modal-plan-info');
     if (modalPlanInfo) modalPlanInfo.classList.add('hidden');
     calSelStart = null; calSelEnd = null;
@@ -346,24 +340,6 @@ if (openReserveBtn) openReserveBtn.addEventListener('click', openReserve);
 if (closeReserveBtn) closeReserveBtn.addEventListener('click', closeReserve);
 if (cancelReserveBtn) cancelReserveBtn.addEventListener('click', closeReserve);
 
-// 免許証プレビュー
-['front', 'back'].forEach(side => {
-    const input = document.getElementById(`license-${side}-input`);
-    if (!input) return;
-    input.addEventListener('change', () => {
-        const file = input.files[0];
-        if (!file) return;
-        const preview = document.getElementById(`preview-${side}`);
-        const placeholder = document.getElementById(`upload-${side}-placeholder`);
-        if (file.type.startsWith('image/')) {
-            preview.src = URL.createObjectURL(file);
-            preview.classList.remove('hidden');
-            placeholder.classList.add('hidden');
-        } else {
-            placeholder.innerHTML = `<span class="text-xs font-bold text-green-600">✓ ${file.name}</span>`;
-        }
-    });
-});
 
 // 貸渡契約書チェック → 送信ボタン有効化
 const yakkanCheckbox = document.getElementById('yakkan-agree');

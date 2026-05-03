@@ -6,7 +6,6 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
-const multer = require('multer');
 const { Resend } = require('resend');
 const Stripe = require('stripe');
 const helmet = require('helmet');
@@ -24,8 +23,6 @@ const MAX_RATE_ENTRIES = 10_000;         // メモリリーク防止
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 管理セッション有効期限（12時間）
 const AUDIT_LOG_MAX_BYTES = 5 * 1024 * 1024; // 監査ログ1ファイル上限(5MB)
 const AUDIT_LOG_KEEP_FILES = 5; // 保持世代数
-const FILE_SIZE_LIMIT = 10 * 1024 * 1024; // 10MB
-const ALLOWED_FILE_TYPES = /jpeg|jpg|png|webp|heic|pdf/i;
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
@@ -544,29 +541,6 @@ function hasConflict(start, end, excludeId, list) {
   });
 }
 
-// ======================================================
-//  Multer 設定（免許証アップロード）
-// ======================================================
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const safeName = `${file.fieldname}_${crypto.randomBytes(8).toString('hex')}${ext}`;
-    cb(null, safeName);
-  }
-});
-const upload = multer({
-  storage,
-  limits: { fileSize: FILE_SIZE_LIMIT },
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).replace('.', '').toLowerCase();
-    if (ALLOWED_FILE_TYPES.test(ext) || ALLOWED_FILE_TYPES.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('許可されていないファイル形式です'));
-    }
-  }
-});
 
 // ======================================================
 //  認証ミドルウェア
@@ -664,29 +638,6 @@ app.post('/x1/mail-test', adminAuth, async (req, res) => {
 // ======================================================
 //  Stripe Checkout Session API
 // ======================================================
-app.post('/api/create-checkout-session', rateLimit(RATE_WINDOW_MS, 20), async (req, res, next) => {
-  try {
-    if (!stripe) return res.status(503).json({ error: 'Stripe が設定されていません' });
-    const { priceId, quantity } = req.body;
-    if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
-      return res.status(400).json({ error: '無効な Price ID です' });
-    }
-    const qty = parseInt(quantity, 10);
-    if (!Number.isInteger(qty) || qty < 1 || qty > 30) {
-      return res.status(400).json({ error: '無効な数量です' });
-    }
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{ price: priceId, quantity: qty }],
-      mode: 'payment',
-      success_url: `${BASE_URL}?booking=success`,
-      cancel_url: `${BASE_URL}`,
-    });
-    res.json({ url: session.url });
-  } catch (err) {
-    next(err);
-  }
-});
 
 // ======================================================
 //  予約 API
@@ -837,87 +788,6 @@ app.post('/api/cancel-reservation', async (req, res, next) => {
   }
 });
 
-// 予約送信（免許証画像付き）— レート制限付き
-app.post('/api/reserve',
-  rateLimit(RATE_WINDOW_MS, RATE_MAX_RESERVE),
-  upload.fields([
-    { name: 'license_front', maxCount: 1 },
-    { name: 'license_back', maxCount: 1 }
-  ]),
-  async (req, res, next) => {
-    try {
-      const name = sanitize(req.body?.name);
-      const email = sanitize(req.body?.email);
-      const phone = sanitize(req.body?.phone);
-      const start = sanitize(req.body?.start);
-      const end = sanitize(req.body?.end);
-
-      // 必須項目チェック
-      if (!name || !email || !phone || !start || !end) {
-        return res.status(400).json({ error: '必須項目が不足しています' });
-      }
-      // メール形式チェック
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: '有効なメールアドレスを入力してください' });
-      }
-      // 電話番号チェック
-      if (!isValidPhone(phone)) {
-        return res.status(400).json({ error: '有効な電話番号を入力してください' });
-      }
-      // 日付形式チェック
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
-        return res.status(400).json({ error: '日付形式が不正です' });
-      }
-      if (new Date(start) >= new Date(end)) {
-        return res.status(400).json({ error: '終了日は開始日の翌日以降にしてください' });
-      }
-      // 過去の日付チェック
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (new Date(start) < today) {
-        return res.status(400).json({ error: '過去の日付は指定できません' });
-      }
-
-      // 免許証アップロード必須（表裏）
-      if (!req.files?.license_front?.[0] || !req.files?.license_back?.[0]) {
-        return res.status(400).json({ error: '免許証の表面・裏面のアップロードは必須です' });
-      }
-
-      // ダブルブッキングチェック
-      const list = await readReservations();
-      if (hasConflict(start, end, null, list)) {
-        return res.status(409).json({ error: 'ご指定の日程は既に予約済みです。別の日程をお選びください。' });
-      }
-
-      const entry = {
-        id: generateId(),
-        name,
-        email,
-        phone,
-        start,
-        end,
-        vehicle: 'スーパーロングハイエース',
-        licenseFront: req.files?.license_front?.[0]?.filename || null,
-        licenseBack: req.files?.license_back?.[0]?.filename || null,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      list.push(entry);
-      await writeReservations(list);
-
-      // メール通知（非同期・エラーでも予約は成功）
-      Promise.allSettled([
-        sendReservationEmail(entry),
-        sendReservationAutoReply(entry)
-      ]).catch(err => console.error('[MAIL] err:', err.message));
-
-      res.json({ ok: true, id: entry.id, message: '予約を受け付けました。確認メールをお送りします。' });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
 
 // ======================================================
 //  お問い合わせ API
@@ -1174,17 +1044,6 @@ app.use((_req, res) => {
 //  グローバルエラーハンドラ
 // ======================================================
 app.use((err, _req, res, _next) => {
-  // Multer エラー
-  if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'ファイルサイズが上限（10MB）を超えています' });
-    }
-    return res.status(400).json({ error: `アップロードエラー: ${err.message}` });
-  }
-  // バリデーションエラー
-  if (err.message === '許可されていないファイル形式です') {
-    return res.status(400).json({ error: err.message });
-  }
   // それ以外の予期しないエラー
   console.error('[ERROR]', err.stack || err.message);
   res.status(500).json({ error: 'サーバーエラーが発生しました。しばらくしてからお試しください。' });
