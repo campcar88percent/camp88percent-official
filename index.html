@@ -509,29 +509,16 @@ index.html の「03 — Pricing」セクションの
     </div>
   </div>
 
-  <button id="stripe-pay-btn">
-    この内容で予約・お支払いへ →
+  <button id="calc-reserve-btn">
+    この日程で予約する →
   </button>
-  <p class="calc-note">※ Stripeの安全な決済画面へ移動します</p>
+  <p class="calc-note">※ カレンダーで日程を選択して予約できます</p>
 </div>
 
 <script>
 // ============================================================
-// 88CAMPCAR — Stripe 料金計算ウィジェット設定
-//
-// 【重要】プランごとに異なる Price ID を設定してください。
-// Stripe Dashboard → Products → 各プランの Price API ID をコピー。
-//
-// Short Stay  (1〜3泊, ¥26,000/泊): price_1TSeBQ8bpHlYoUmIDPVhnR1M
-// Medium Plan (4〜6泊, ¥22,000/泊): price_1TSeEL8bpHlYoUmIWTpQgttL
-// Weekly Plan (7泊〜,  ¥19,000/泊): price_1TSeGH8bpHlYoUmIdE6lHQmt
+// 88CAMPCAR — 料金計算ウィジェット
 // ============================================================
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_51TJQD18bpHlYoUmI7j11MAaRrfIN0Eo4moHzWQQZOvFzNXOwIeEqGFVgWxUGlqq8lG2qxStyJhzRvPkRhfHHOOMz00ZHF2rrTc';
-const PRICE_IDS = {
-  short:  'price_1TJqs78bpHlYoUmIXg5t02SS', // ¥26,000/泊
-  medium: 'price_1TKetV8bpHlYoUmIWFTIcrDB', // ¥22,000/泊
-  weekly: 'price_1TKeuV8bpHlYoUmIBf4Zv9Mo', // ¥19,000/泊
-};
 
 let nights = 1;
 
@@ -574,35 +561,14 @@ function updateCalc() {
   document.getElementById('discount-badge').textContent = discountText;
 }
 
-async function goToStripe() {
-  const btn = document.getElementById('stripe-pay-btn');
-  btn.disabled = true;
-  btn.textContent = '処理中...';
-
-  const planKey = getPlanKey(nights);
-  const priceId = PRICE_IDS[planKey];
-
-  try {
-    const res = await fetch('/api/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceId, quantity: nights }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.url) throw new Error(data.error || 'エラーが発生しました');
-    window.location.href = data.url;
-  } catch (e) {
-    alert('エラーが発生しました: ' + e.message);
-    btn.disabled = false;
-    btn.textContent = 'この内容で予約・お支払いへ →';
-  }
-}
 
 // 初期化
 updateCalc();
 document.getElementById('nights-minus').addEventListener('click', () => changeNights(-1));
 document.getElementById('nights-plus').addEventListener('click', () => changeNights(1));
-document.getElementById('stripe-pay-btn').addEventListener('click', goToStripe);
+document.getElementById('calc-reserve-btn').addEventListener('click', () => {
+  document.getElementById('reserve').scrollIntoView({ behavior: 'smooth' });
+});
 </script>
 	<!-- pricing cards -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 max-w-5xl">
